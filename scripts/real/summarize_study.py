@@ -138,7 +138,7 @@ def main(argv=None):
     parser.add_argument('inputs', type=Path, nargs='+')
     parser.add_argument('--csv', type=Path)
     parser.add_argument('--strict', action='store_true',
-                        help='Require all 5 model conditions x 1 seed x 5 cells, with 40 ID and 15 per OOD cell')
+                        help='Require baseline/improved x 1 seed x 5 cells, with 40 ID and 15 per OOD cell')
     args = parser.parse_args(argv)
     rows = read_logs(args.inputs)
     if not rows:

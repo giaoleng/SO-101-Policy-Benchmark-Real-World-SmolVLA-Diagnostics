@@ -70,5 +70,5 @@ logging:
 evaluation:
   episodes: 5
   split: baseline
-  condition: baseline  # 单次探索性评测分组；正式五模型对照使用 evaluate_study.py
+  condition: baseline  # 单次探索性评测分组；正式两模型对照使用 evaluate_study.py
   output: ./outputs/real/evaluation.jsonl

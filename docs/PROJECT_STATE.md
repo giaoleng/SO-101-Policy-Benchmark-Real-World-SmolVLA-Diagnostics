@@ -1,48 +1,38 @@
 # 项目状态
 
-更新日期：2026-11-19
+## 仿真实验
 
-## 当前项目范围
+SO-101 MuJoCo：红色方块放入蓝色收纳盒。
 
-本项目围绕 SO-101 机械臂的抓取放置任务，完成了 MuJoCo 仿真策略对比和 SO-101 真机 SmolVLA 示教数据策略实验。当前公开文档只记录以下两组实验，不再包含早期多物体目标选择实验的结果。
+| 模型 | ID Success Rate | OOD Success Rate |
+|---|---:|---:|
+| ACT | 89% | 72% |
+| Diffusion Policy | 80% | 62% |
+| SmolVLA | 95% | 83% |
 
-### MuJoCo 仿真
+## SO-101 真机 Cube → Cup
 
-- **任务：** 抓取红色方块并放入蓝色收纳盒。
-- **策略：** ACT、Diffusion Policy、SmolVLA。
-- **实验状态：** 三种策略的训练与 ID / OOD 闭环评测均已完成。
+项目展示采用 **Baseline SmolVLA** 与 **Improved SmolVLA** 两组对照，均为 Full Fine-Tuning（不使用 LoRA）。
 
-| 指标 | ACT | Diffusion Policy | SmolVLA |
-|---|---:|---:|---:|
-| Success Rate | **89%** | 80% | 95% |
-| OOD Success Rate | **72%** | 62% | 83% |
+- Baseline：原始示教数据。
+- Improved：将 Clean、Randomized、Recovery、Color-varied 四组各 50 条示教合并，形成 200 条增强训练数据。绿色 Cube 仅用于 OOD 测试。
+- 统一训练入口：`scripts/real/train_study.py`，通过 `--condition baseline|improved` 选择数据。
+- 数据合并入口：`scripts/real/merge_study_datasets.py`，使用 LeRobot 0.5.1 的正式合并工具处理索引与视频。
+- 统一真机评测入口：`scripts/real/evaluate_study.py`。
+- 评测协议：每组模型 ID 40 次，OOD 60 次（新位置、低光照、绿色方块、干扰物各 15 次），每个场景另有一次预热。
+- 统一汇总：`scripts/real/summarize_study.py`，`--strict` 校验两模型各 100 个正式 Episode。
 
-### SO-101 真机
+README 首页保留已有的初始与改进模型摘要结果。但该结果与新的每模型 ID 40 / OOD 60 计数粒度并不完全相容，因此不应声称上述摘要百分比由此新协议的成功次数直接计算得出。
 
-- **任务：** 抓取桌面方块并放入固定杯子（Cube → Cup）。
-- **策略：** SmolVLA。
-- **训练条件：** Baseline、Clean、Randomized、Recovery、Color-varied，共五组独立训练。
-- **训练设置：** Seed 1000、10,000 steps、batch size 32。
-- **评测设置：** 每个模型 100 次正式计分（ID 40 次，四类 OOD 各 15 次），每个模型另有 5 次预热。
-- **实验状态：** 五组模型的训练和统一真机评测均已完成，共完成 500 次正式计分 Rollout 和 25 次预热。
+当前版本提供上述两模型训练与评测**工程入口**；历史上独立训练的四个策略模型不自动等价于合并训练的 Improved Checkpoint。正式两模型对照的实际权重与逐回合日志必须另行对应核验。
 
-公开仓库当前不列出五组模型的具体真机成功率数值；真机实验结论应以实际训练权重、数据集和评测日志为依据，不使用仿真指标替代真机结果。
+## 工程入口
 
-## 工程实现
+- `scripts/real/download_study_datasets.py`：从 `giaobo/so101-smovla` 下载四组示教数据。
+- `scripts/real/merge_study_datasets.py`：校验并合并四组 LeRobotDataset。
+- `scripts/real/train_study.py`：Baseline / Improved 统一微调入口。
+- `scripts/real/study_protocol.py`：示教采集和 ID / OOD 评测计划。
+- `scripts/real/evaluate_study.py`：真机评测。
+- `scripts/real/summarize_study.py`：回合级与失败模式统计。
 
-仓库包含：
-
-- SO-101 MuJoCo 场景、环境封装与脚本控制器；
-- ACT、Diffusion Policy、SmolVLA 的训练入口和统一仿真评测工具；
-- SO-101 真机数据采集、SmolVLA 训练、受保护的部署与评测入口；
-- 训练清单、逐回合评测记录、统计汇总工具；
-- 机械臂标定、相机配置和硬件安全检查文档。
-
-设备标定文件、私有数据集、训练权重和原始实验日志不提交到公共 Git 仓库。公开仓库中的命令和配置用于说明工程入口；复现实验时还需准备对应数据、模型权重、LeRobot 环境及已标定的真实硬件。
-
-## 结果口径
-
-- 仿真结果只对应红色方块放入蓝色收纳盒任务。
-- 真机实验只对应 Cube → Cup 任务和五组 SmolVLA 数据条件。
-- 两种任务的物理环境、观测与成功判定不同，分别统计，不合并为同一个成功率。
-- 任何未在公开文档列出的真机数值，都不从仿真结果或其他实验中推算。
+设备标定文件、实际训练 Checkpoint 及原始真机日志不随公开源码仓库发布。

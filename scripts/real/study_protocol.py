@@ -12,7 +12,8 @@ from pathlib import Path
 
 TRAIN_CONDITIONS = ('clean', 'randomized', 'recovery', 'color')
 BASELINE_CONDITION = 'baseline'
-MODEL_CONDITIONS = (BASELINE_CONDITION, *TRAIN_CONDITIONS)
+IMPROVED_CONDITION = 'improved'
+MODEL_CONDITIONS = (BASELINE_CONDITION, IMPROVED_CONDITION)
 EVAL_CELLS = ('in_distribution', 'new_positions', 'reduced_lighting', 'different_object', 'distractors')
 TRAINING_SEEDS = (1000,)
 SCORED_EPISODES = {

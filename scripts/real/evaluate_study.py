@@ -30,7 +30,7 @@ def build_parser():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--config', default='configs/real/so101.yaml')
     p.add_argument('--condition', choices=MODEL_CONDITIONS, required=True,
-                   help='baseline uses the original real-robot demonstrations; other values are the four fixed strategies')
+                   help='baseline uses original demonstrations; improved uses the merged four-condition dataset')
     p.add_argument('--cell', choices=EVAL_CELLS, required=True)
     p.add_argument('--seed', type=int, choices=TRAINING_SEEDS, required=True,
                    help='Seed of the trained checkpoint (not an inference RNG seed)')

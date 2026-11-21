@@ -1,124 +1,76 @@
 # SO-101 真机 SmolVLA 训练与评测
 
-## 实验状态与任务定义
+## 模型对照
 
-本项目已完成 SO-101 真机 Cube → Cup 实验。任务为根据固定语言指令抓取桌面方块并放入杯子：
+统一使用同一个 SmolVLA 全参数微调入口，区分两组训练数据：
 
-<code>Pick up the cube and place it in the cup.</code>
-
-本轮真机实验比较一个原始示教 Baseline 和四种固定策略示教数据训练得到的 SmolVLA 模型：
-
-- Baseline
-- Clean
-- Randomized
-- Recovery
-- Color-varied
-
-五组模型均已完成独立训练与统一真机评测。公开仓库不展示五组模型的具体真机成功率数值；统计应以实际数据集、训练权重、manifest 和评测日志为准。
-
-## 硬件与安全前置条件
-
-正式采集、部署或评测前，先完成 [SO-101 真机硬件部署指南](REAL_HARDWARE_SETUP.md) 中的机械臂标定、相机检查和硬件安全检查。
-
-- Follower / Leader 使用各自对应的串口和标定文件。
-- 核对 front / wrist 相机索引、图像尺寸、FPS 和训练时的 feature rename map。
-- 核对关节限位、夹爪方向、工作空间、软件停止入口和实体急停。
-- 设备标定 JSON、相机参数和真实设备标识保存在本机，不提交到公共仓库。
-- <code>configs/real/so101.yaml</code> 默认 <code>robot.hardware_confirmed: false</code>。只有完成本机硬件检查后，才按实际设备配置启用真机。
-
-软件 STOP 文件不能替代实体急停。首次运行和配置变更后，应先执行低风险检查并确认机械臂处于可控状态。
-
-## 示教数据
-
-四种固定策略各包含 50 条示教：
-
-| 条件 | 数据组成 | 主要考察能力 |
+| 模型 | 训练数据 | 目的 |
 |---|---|---|
-| Clean | 固定位置的正常成功示教 | 基础抓取放置 |
-| Randomized | T1–T10 位置变化示教 | 位置泛化 |
-| Recovery | 包含主动释放、重新抓取的示教 | 掉落后的恢复能力 |
-| Color-varied | 红、橙、黄、蓝、紫五种颜色示教 | 外观变化下的任务表现 |
+| Baseline | 原始 Cube → Cup 示教 | 基础对照 |
+| Improved | Clean + Randomized + Recovery + Color-varied，共 200 条 | 展示多样化及恢复示教数据的影响 |
 
-四组数据统一存放于 [<code>giaobo/so101-smovla</code>](https://huggingface.co/datasets/giaobo/so101-smovla)，分别位于 <code>cube-pickup-clean</code>、<code>cube-pickup-randomized</code>、<code>cube-pickup-recovery</code>、<code>cube-pickup-color</code> 子目录。数据包含双相机图像、六维 action/state 和任务指令。下载入口为 <code>scripts/real/download_study_datasets.py</code>，默认将四个子目录分别保存至本地 <code>data/real_demonstrations/{clean,randomized,recovery,color}/</code>，并记录统一仓库 commit SHA 及各子目录校验信息。训练时须将数据集相机特征映射到模型使用的 camera1 / camera2 输入。
+四组增强示教由 Hugging Face Dataset [`giaobo/so101-smovla`](https://huggingface.co/datasets/giaobo/so101-smovla) 提供，分别位于 `cube-pickup-clean`、`cube-pickup-randomized`、`cube-pickup-recovery`、`cube-pickup-color` 子目录，绿色 Cube 不进入训练集。
 
-## 训练设置
+## 硬件与安全
 
-正式对照包含 5 次独立训练运行，训练种子为 Seed 1000：
+正式采集或评测前，需完成 [硬件部署指南](REAL_HARDWARE_SETUP.md) 的校准与安全检查。配置 `configs/real/so101.yaml` 默认将 `robot.hardware_confirmed` 设为 `false`；硬件校准完成后才能在本机启用。软件停止文件不能替代物理急停。
 
-- 基础模型：同一 SmolVLA 预训练权重；
-- 训练预算：10,000 steps；
-- Batch size：32；
-- Checkpoint 保存间隔：2,000 steps；
-- 唯一变化因素：训练数据条件。
+## 数据下载与合并
 
-训练入口：<code>scripts/real/train_study.py</code>。每次训练生成 <code>study_manifest.json</code>，记录数据条件、Seed、训练预算、数据集信息及权重摘要，供评测入口核验。
+```bash
+python scripts/real/download_study_datasets.py
+python scripts/real/merge_study_datasets.py --dry-run
+python scripts/real/merge_study_datasets.py \
+  --input-root data/real_demonstrations \
+  --output data/real_so101_improved \
+  --repo-id local/so101_improved
+```
 
-示例（路径按本机环境替换）：
+LeRobot 0.5.1 的合并工具会处理 Episode 重编号、视频和元数据。源数据需要相同 Schema / FPS。合并脚本拒绝覆盖已有输出目录。
 
-~~~bash
+## Full Fine-Tuning
+
+统一训练种子 1000、10,000 steps、batch size 32，每隔 2,000 steps 保存 Checkpoint。训练命令显式设置 `freeze_vision_encoder=false`、`train_expert_only=false`、`train_state_proj=true`，不使用 LoRA。LeRobot 0.5.1 默认预设为 AdamW、Learning Rate `1e-4`、Warmup `1000 steps`，实际生效值请核对 Base Model 配置及训练日志。
+
+```bash
+# Baseline，先检查命令
 python scripts/real/train_study.py \
-  --condition clean --seed 1000 \
-  --dataset-root data/real_demonstrations/clean \
-  --repo-id giaobo/so101-smovla \
+  --condition baseline --seed 1000 \
+  --dataset-root data/real_so101_baseline \
+  --repo-id local/so101_baseline \
   --base-model /path/to/local/smolvla_base \
-  --output outputs/train/real_clean_seed1000 \
-  --execute
-~~~
+  --output outputs/train/real_baseline_seed1000 --dry-run
+
+# Improved，先检查命令
+python scripts/real/train_study.py \
+  --condition improved --seed 1000 \
+  --dataset-root data/real_so101_improved \
+  --repo-id local/so101_improved \
+  --base-model /path/to/local/smolvla_base \
+  --output outputs/train/real_improved_seed1000 --dry-run
+```
+
+检查后改为 `--execute` 才执行真实训练。训练产物包括 Checkpoint 与用于核验的 `study_manifest.json`。
 
 ## 统一真机评测
 
-五个模型均按相同的五类场景评测。每个模型包含 100 次正式计分和 5 次预热：
+每个模型 ID 40 次，OOD 四场景分别 15 次，共 100 次正式计分，另有 5 次预热。两模型总计 200 次正式计分加 10 次预热。成功结果由操作者按任务完成条件人工核验；回合失败模式和控制日志由工具记录。
 
-| 场景 | 正式计分 | 环境条件 |
-|---|---:|---|
-| ID | 40 | 红色方块 T6、标准光照 |
-| New positions | 15 | E1–E5 未示教位置，每处 3 次 |
-| Reduced lighting | 15 | T6、降低照明 |
-| Different object | 15 | 未参与训练的绿色方块 |
-| Distractors | 15 | T6、增加非目标物体 |
-| **每个模型** | **100** | 另有 5 次预热 |
-| **五个模型** | **500** | 另有 25 次预热 |
-
-该评测协议已执行完成，共完成 500 次正式计分 Rollout 和 25 次不计分预热。
-
-评测入口为 <code>scripts/real/evaluate_study.py</code>。每个场景由操作者按协议复位物体、检查安全状态并记录结果；动作下发或视频观感不能代替成功判定。评测入口使用训练时生成的 manifest 核对模型条件、Seed、训练预算和 checkpoint。
-
-## 失败模式汇总
-
-使用 <code>scripts/real/summarize_study.py</code> 汇总逐回合日志，按模型条件、Seed 和评测场景统计成功次数、成功率及 Wilson 95% 区间，并计算：
-
-- No-Motion Rate
-- Reach Rate
-- Grasp Rate
-- Drop Rate
-- Re-grasp per Drop
-- Recovery per Drop
-
-未被实际标注的阶段指标保持为空，不自动推断成功或失败。当前运行器记录回合级推理延迟、控制步数、限幅次数及操作者标签；逐步关节轨迹、动作方向角和相机视频不属于自动评测日志字段。
-
-## 复现实验命令
-
-先检查评测计划：
-
-~~~bash
+```bash
 python scripts/real/study_protocol.py --phase evaluate --cell in_distribution
-~~~
 
-执行某个模型的 ID 评测（示例路径需替换为对应模型的实际产物）：
-
-~~~bash
 python scripts/real/evaluate_study.py \
-  --condition baseline --seed 1000 --cell in_distribution \
-  --checkpoint outputs/train/real_baseline_seed1000/checkpoints/010000/pretrained_model \
-  --training-manifest outputs/train/real_baseline_seed1000/study_manifest.json \
-  --output outputs/real/eval_baseline_s1000_in_distribution.jsonl --execute
-~~~
+  --condition improved --seed 1000 --cell in_distribution \
+  --checkpoint outputs/train/real_improved_seed1000/checkpoints/010000/pretrained_model \
+  --training-manifest outputs/train/real_improved_seed1000/study_manifest.json \
+  --output outputs/real/eval_improved_s1000_id.jsonl --dry-run
 
-汇总所有评测日志：
-
-~~~bash
 python scripts/real/summarize_study.py outputs/real/eval_*.jsonl \
   --csv outputs/real/study_summary.csv --strict
-~~~
+```
 
-以上命令用于说明已实现的训练和评测入口。实际执行需要准备本地数据、模型权重、设备标定和运行环境；不要将示例路径当作仓库内已提供的实验产物。
+模型推理由 `RealPolicyRunner` 加载真实 Checkpoint，调用 `policy.select_action(...)`。目前配置的控制频率为 20 Hz，最长回合 45 秒，最多 900 个控制步，推理超时 1 秒。LeRobot 0.5.1 默认预设 `num_steps=10`、`chunk_size=50`、`n_action_steps=50`，实际数值由加载的 Checkpoint 配置决定；评测脚本不覆盖。
+
+## 结果口径
+
+README 首页保留此前的模型摘要成绩，但不能将其认定为两模型新协议下 40 ID / 60 OOD 的精确统计结果。已有四组独立训练和评测也不等价于 Improved 使用 200 条合并数据的训练；实际获得相应 Checkpoint 与评测日志后，才能形成新方案的正式对照结果。
