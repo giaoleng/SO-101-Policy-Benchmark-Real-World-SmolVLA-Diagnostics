@@ -80,6 +80,27 @@ class RealInterfaces(unittest.TestCase):
         self.assertTrue(result['dropped'])
         self.assertEqual(result['failure_mode'], 'recovery')
 
+    def test_recovery_study_requires_complete_controlled_drop_labels(self):
+        result = read_outcome(lambda _: (
+            '{"success":true,"dropped":true,"regrasp_attempted":true,'
+            '"regrasped":true,"placed":true}'
+        ), require_recovery=True)
+        self.assertTrue(result['success'])
+        self.assertTrue(result['regrasped'])
+
+    def test_recovery_study_rejects_missing_drop_or_inconsistent_success(self):
+        answers = iter([
+            '{"success":false,"dropped":false,"regrasp_attempted":false,'
+            '"regrasped":false,"placed":false}',
+            '{"success":true,"dropped":true,"regrasp_attempted":true,'
+            '"regrasped":false,"placed":true}',
+            '{"success":false,"dropped":true,"regrasp_attempted":true,'
+            '"regrasped":false,"placed":false}',
+        ])
+        result = read_outcome(lambda _: next(answers), require_recovery=True)
+        self.assertFalse(result['success'])
+        self.assertTrue(result['dropped'])
+
     def test_checkpoint_category_contract(self):
         c = TaskConditioner(self.category_cfg)
         feature = {c.feature_key: c.dataset_feature()}
