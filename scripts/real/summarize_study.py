@@ -52,6 +52,9 @@ def read_logs(paths: list[Path]) -> list[dict]:
                     raise ValueError(f'{path}:{n}: completed must be boolean')
                 if row.get('is_warmup') is True or not row['completed']:
                     continue
+                # Recovery trials are a separate ten-drop protocol and use summarize_recovery.py.
+                if row.get('eval_cell') == 'recovery':
+                    continue
                 if (row.get('train_condition') not in MODEL_CONDITIONS or
                         row.get('eval_cell') not in EVAL_CELLS or
                         type(row.get('seed')) is not int or row['seed'] not in TRAINING_SEEDS or
