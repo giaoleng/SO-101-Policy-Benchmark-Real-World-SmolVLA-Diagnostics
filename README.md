@@ -149,7 +149,7 @@ https://github.com/user-attachments/assets/55915c62-7fe4-46f4-ad79-bfd149a8a380
 | 维度 | MuJoCo 仿真实验 | SO-101 真机实验 |
 | :--- | :--- | :--- |
 | **机器人平台** | SO-101（5 旋转关节 + 1 夹爪，MJCF 物理模型） | SO-101 实体机械臂 + 夹爪 + 双路 640×480@30fps 相机 |
-| **任务目标** | 抓取**红色方块**放入**蓝色收纳盒**（含多色干扰方块） | 抓取桌面**方块**放入**杯子**（`Cube → Cup`） |
+| **任务目标** | 抓取**红色方块**放入**蓝色收纳盒** | 抓取桌面**方块**放入**杯子**（`Cube → Cup`） |
 | **数据来源** | **直接采用开源 LeRobotDataset**（经本地格式校验与统计归一化） | Clean、Randomized、Recovery、Color-varied 四种固定策略示教数据 |
 | **对比策略** | **ACT** vs. **Diffusion Policy** vs. **SmolVLA** | **SmolVLA**（Baseline vs. Improved） |
 | **语言指令** | 固定仿真任务描述 | `Pick up the cube and place it in the cup.` |
