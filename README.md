@@ -598,7 +598,7 @@ python scripts/real/merge_study_datasets.py \
 # Baseline
 python scripts/real/train_study.py \
   --condition baseline --seed 1000 \
-  --dataset-root data/real_so101_baseline \
+  --dataset-root data/real_demonstrations/clean \
   --repo-id local/so101_baseline \
   --base-model /path/to/local/smolvla_base \
   --output outputs/train/real_baseline_seed1000 --dry-run
