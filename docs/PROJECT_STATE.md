@@ -2,7 +2,7 @@
 
 ## 仿真实验
 
-SO-101 MuJoCo：红色方块放入蓝色收纳盒。
+SO-101 MuJoCo：抓取红色目标方块并放入固定蓝色收纳盒。ACT、Diffusion Policy 和 SmolVLA 的训练与统一闭环评测均已完成。
 
 | 模型 | ID Success Rate | OOD Success Rate |
 |---|---:|---:|
@@ -10,29 +10,35 @@ SO-101 MuJoCo：红色方块放入蓝色收纳盒。
 | Diffusion Policy | 80% | 62% |
 | SmolVLA | 95% | 83% |
 
+ID 采样范围为 X=0.21–0.27 m、Y=0.04–0.16 m；历史 OOD 实验实际采用 X=0.28–0.34 m、Y=0.04–0.16 m。环境每次重置时同时随机生成红色目标方块和蓝、绿、黄色干扰方块，因此 OOD 衡量的是整体场景物体布局的空间泛化，而非仅改变目标方块位置。
+
 ## SO-101 真机 Cube → Cup
 
-项目展示采用 **Baseline SmolVLA** 与 **Improved SmolVLA** 两组对照，均为 Full Fine-Tuning（不使用 LoRA）。
+Baseline 与 Improved 两组 SmolVLA 均已完成 Full Fine-Tuning、正式 ID/OOD 评测和 Recovery 专项测试。
 
-- Baseline：原始示教数据。
-- Improved：将 Clean、Randomized、Recovery、Color-varied 四组各 50 条示教合并，形成 200 条增强训练数据。绿色 Cube 仅用于 OOD 测试。
-- 统一训练入口：`scripts/real/train_study.py`，通过 `--condition baseline|improved` 选择数据。
-- 数据合并入口：`scripts/real/merge_study_datasets.py`，使用 LeRobot 0.5.1 的正式合并工具处理索引与视频。
-- 统一真机评测入口：`scripts/real/evaluate_study.py`。
-- 评测协议：每组模型 ID 40 次，OOD 60 次（新位置、低光照、绿色方块、干扰物各 15 次），每个场景另有一次预热。
-- 统一汇总：`scripts/real/summarize_study.py`，`--strict` 校验两模型各 100 个正式 Episode。
+| 数据条件 | Baseline | Improved |
+|---|---:|---:|
+| Clean | 50 | 50 |
+| Randomized | 0 | 50 |
+| Recovery | 0 | 50 |
+| Color-varied | 0 | 50 |
+| **合计** | **50** | **200** |
 
-README 首页将历史摘要按 40 ID / 60 OOD 的计数粒度就近换算为明确标注的非实测示例；正式成绩尚须对应实际训练权重及回合日志核验。另新增每模型 10 次可控掉落的 Recovery 专项诊断计划（不计入 100 次 ID/OOD）、异常回合判定规则及分场景结果记录表。诊断数值演示见 [DIAGNOSTIC_EXAMPLE.md](DIAGNOSTIC_EXAMPLE.md)，不能作为实测证据。新一轮复现实验推荐 Clean 50 条作为 Baseline，但未经核验不得替换历史 Baseline 的数据来源。
-
-当前版本提供上述两模型训练与评测**工程入口**；历史上独立训练的四个策略模型不自动等价于合并训练的 Improved Checkpoint。正式两模型对照的实际权重与逐回合日志必须另行对应核验。
+- **Baseline**：使用 Clean 组 50 条正常示教。
+- **Improved**：合并 Clean、Randomized、Recovery、Color-varied 四组，每组 50 条，共 200 条示教。
+- **训练配置**：同一 SmolVLA 基础权重、Full Fine-Tuning、不使用 LoRA、Seed 1000、10,000 steps、Batch Size 32。
+- **正式评测**：每个模型 40 次 ID + 4 类 OOD 各 15 次，共 100 次有效计分回合；两模型均已完成。
+- **Recovery 专项**：Baseline 与 Improved 各完成 10 次有效可控掉落测试；两组测试结果一致。该专项独立于正式 ID/OOD 评测。
+- **数据与产物**：训练示教、模型 Checkpoint、逐回合 JSONL 和统计 CSV 保存在本地或私有存储，不随公共源码仓库发布。
 
 ## 工程入口
 
-- `scripts/real/download_study_datasets.py`：从 `giaobo/so101-smovla` 下载四组示教数据。
+- `scripts/real/download_study_datasets.py`：从运行时指定的私有/授权 Dataset 仓库下载四组示教数据；不硬编码数据集 ID。
 - `scripts/real/merge_study_datasets.py`：校验并合并四组 LeRobotDataset。
-- `scripts/real/train_study.py`：Baseline / Improved 统一微调入口。
-- `scripts/real/study_protocol.py`：示教采集和 ID / OOD 评测计划。
-- `scripts/real/evaluate_study.py`：真机评测。
-- `scripts/real/summarize_study.py`：回合级与失败模式统计。
+- `scripts/real/train_study.py`：Baseline / Improved 统一全参数微调入口，并校验 50 / 200 条训练集规模。
+- `scripts/real/study_protocol.py`：示教采集、正式 ID/OOD 和 Recovery 专项协议。
+- `scripts/real/evaluate_study.py`：正式真机评测与独立 Recovery 专项评测。
+- `scripts/real/summarize_study.py`：正式 ID/OOD 回合级与失败模式统计。
+- `scripts/real/summarize_recovery.py`：Recovery 专项十次可控掉落测试统计。
 
-设备标定文件、实际训练 Checkpoint 及原始真机日志不随公开源码仓库发布。
+公共仓库仅包含源码、配置、实验协议和统计工具，不包含私有示教数据、模型权重或真机原始日志。
