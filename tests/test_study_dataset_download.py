@@ -2,15 +2,17 @@ import unittest
 
 from scripts.real.download_study_datasets import (
     DATASET_DIRS,
-    DATASET_REPO_ID,
     REQUIRED_FEATURES,
+    build_parser,
     validate_dataset_metadata,
 )
 
 
 class StudyDatasetDownloadTests(unittest.TestCase):
-    def test_all_conditions_use_the_projects_single_dataset_repo(self):
-        self.assertEqual(DATASET_REPO_ID, "giaobo/so101-smovla")
+    def test_dataset_repository_is_supplied_at_runtime(self):
+        args = build_parser().parse_args(["--repo-id", "owner/private-so101", "--dry-run"])
+        self.assertEqual(args.repo_id, "owner/private-so101")
+        self.assertEqual(args.revision, "main")
         self.assertEqual(
             DATASET_DIRS,
             {
@@ -20,6 +22,10 @@ class StudyDatasetDownloadTests(unittest.TestCase):
                 "color": "cube-pickup-color",
             },
         )
+
+    def test_repo_id_is_required(self):
+        with self.assertRaises(SystemExit):
+            build_parser().parse_args(["--dry-run"])
 
     def test_expected_lerobot_schema_is_validated(self):
         metadata = {
