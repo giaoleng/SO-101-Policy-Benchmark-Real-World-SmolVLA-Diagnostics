@@ -20,7 +20,7 @@ import subprocess
 
 from scripts.real.study_protocol import (
     BASELINE_CONDITION, MODEL_CONDITIONS, TRAINING_SEEDS, DEMOS_PER_CONDITION,
-    TRAIN_CONDITIONS, IMPROVED_CONDITION,
+    BASELINE_DEMOS, TRAIN_CONDITIONS, IMPROVED_CONDITION,
 )
 
 
@@ -50,10 +50,10 @@ def check_dataset(root: Path, condition: str = 'clean'):
         raise ValueError(f'Unknown model condition: {condition}')
     info = json.loads((root / 'meta' / 'info.json').read_text(encoding='utf-8'))
     n = info.get('total_episodes')
-    if type(n) is not int or n < 1:
-        raise ValueError(f'{root}: expected at least one expert demonstration, got {n}')
-    if condition == IMPROVED_CONDITION and n != DEMOS_PER_CONDITION * len(TRAIN_CONDITIONS):
-        raise ValueError(f'{root}: improved requires all {DEMOS_PER_CONDITION * len(TRAIN_CONDITIONS)} merged demonstrations, got {n}')
+    expected = (BASELINE_DEMOS if condition == BASELINE_CONDITION
+                else DEMOS_PER_CONDITION * len(TRAIN_CONDITIONS))
+    if type(n) is not int or n != expected:
+        raise ValueError(f'{root}: {condition} requires exactly {expected} demonstrations, got {n}')
     features = info.get('features', {})
     for key in ('action', 'observation.state'):
         if features.get(key, {}).get('shape') != [6]:
@@ -68,7 +68,7 @@ def main(argv=None):
     parser.add_argument('--condition', required=True, choices=MODEL_CONDITIONS)
     parser.add_argument('--seed', required=True, type=int, choices=TRAINING_SEEDS)
     parser.add_argument('--dataset-root', required=True, type=Path,
-                        help='Baseline dataset or the 200-episode merged Improved dataset')
+                        help='Baseline Clean dataset (50 episodes) or merged Improved dataset (200 episodes)')
     parser.add_argument('--repo-id', required=True)
     parser.add_argument('--base-model', required=True, type=Path, help='Local SmolVLA base checkpoint')
     parser.add_argument('--output', required=True, type=Path)
@@ -135,7 +135,7 @@ def main(argv=None):
                 'save_freq': 2000, 'rename_map': rename,
                 'finetuning_method': 'full', 'freeze_vision_encoder': False,
                 'train_expert_only': False, 'train_state_proj': True,
-                'dataset_composition': ('four_conditions_merged' if args.condition == IMPROVED_CONDITION else 'original_baseline')}
+                'dataset_composition': ('clean_50' if args.condition == BASELINE_CONDITION else 'four_conditions_merged_200')}
     with (args.output / 'study_manifest.json').open('x', encoding='utf-8') as fh:
         json.dump(manifest, fh, ensure_ascii=False, indent=2)
 
