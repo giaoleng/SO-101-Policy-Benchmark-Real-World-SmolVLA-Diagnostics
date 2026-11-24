@@ -21,7 +21,8 @@ from scripts.real.evaluate_policy import read_outcome
 from scripts.real.runtime import RealPolicyRunner, local_path
 from scripts.real.study_protocol import (
     EVAL_CELLS, MODEL_CONDITIONS, TRAINING_SEEDS, SCORED_EPISODES,
-    TOTAL_SCORED_EPISODES, WARMUP_EPISODES, evaluation_plan,
+    TOTAL_SCORED_EPISODES, WARMUP_EPISODES, RECOVERY_TESTS_PER_MODEL,
+    evaluation_plan, recovery_plan,
 )
 from scripts.eval.act_rollout import JsonlRecorder
 
@@ -31,7 +32,8 @@ def build_parser():
     p.add_argument('--config', default='configs/real/so101.yaml')
     p.add_argument('--condition', choices=MODEL_CONDITIONS, required=True,
                    help='baseline uses original demonstrations; improved uses the merged four-condition dataset')
-    p.add_argument('--cell', choices=EVAL_CELLS, required=True)
+    p.add_argument('--cell', choices=(*EVAL_CELLS, 'recovery'), required=True,
+                   help='recovery is a separate ten-trial controlled-drop protocol')
     p.add_argument('--seed', type=int, choices=TRAINING_SEEDS, required=True,
                    help='Seed of the trained checkpoint (not an inference RNG seed)')
     p.add_argument('--checkpoint', type=Path, required=True)
@@ -75,14 +77,19 @@ def main(argv=None):
     p = build_parser()
     args = p.parse_args(argv)
     cfg = _prepare_runner_config(args)
-    cells = evaluation_plan(args.cell)
-    expected_scored = SCORED_EPISODES[args.cell]
+    is_recovery = args.cell == 'recovery'
+    cells = recovery_plan(args.condition) if is_recovery else evaluation_plan(args.cell)
+    expected_scored = RECOVERY_TESTS_PER_MODEL if is_recovery else SCORED_EPISODES[args.cell]
+    total_scored = RECOVERY_TESTS_PER_MODEL if is_recovery else TOTAL_SCORED_EPISODES
+    warmup_count = 0 if is_recovery else WARMUP_EPISODES
     summary = {'condition': args.condition, 'eval_cell': args.cell,
+               'protocol': 'controlled_drop_recovery' if is_recovery else 'formal_id_ood',
+               'independent_of_formal_id_ood': is_recovery,
                'seed': args.seed, 'checkpoint': cfg['policy']['checkpoint'],
                'training_manifest': str(local_path(args.training_manifest)),
                'scored_episodes': expected_scored,
-               'total_scored_episodes_per_model': TOTAL_SCORED_EPISODES,
-               'warmup_episodes': WARMUP_EPISODES,
+               'total_scored_episodes_per_model': total_scored,
+               'warmup_episodes': warmup_count,
                'output': str(local_path(args.output)), 'will_execute': args.execute}
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     if not args.execute:
@@ -117,9 +124,15 @@ def main(argv=None):
         for item in cells:
             label = ('warmup (not scored)' if item['warmup']
                      else f"scored {item['scored_episode']}/{expected_scored}")
-            input(f"[{args.condition}/seed{args.seed} {args.cell}] episode {item['episode']} {label}\n"
-                  f"Position={item['position_id']}, color={item['cube_color']}, lighting={item['lighting']}, "
-                  f"distractors={item['distractors']}. Confirm physical scene + safe home; Enter to run: ")
+            if is_recovery:
+                prompt = (f"[{args.condition}/seed{args.seed} recovery] trial {item['episode']}/10\\n"
+                          "按既定可控掉落流程准备场景，确认目标可见、可达且机械臂处于安全起始姿态；"
+                          "执行后不进行人工接管。按 Enter 运行： ")
+            else:
+                prompt = (f"[{args.condition}/seed{args.seed} {args.cell}] episode {item['episode']} {label}\\n"
+                          f"Position={item['position_id']}, color={item['cube_color']}, lighting={item['lighting']}, "
+                          f"distractors={item['distractors']}. Confirm physical scene + safe home; Enter to run: ")
+            input(prompt)
             common = {'train_condition': args.condition, 'eval_cell': args.cell,
                       'seed': args.seed, 'episode': item['episode'],
                       'position_id': item['position_id'], 'cube_color': item['cube_color'],
@@ -134,7 +147,7 @@ def main(argv=None):
                     recorder({**common, **motion, 'completed': False})
                     print('Warmup recorded without success label; excluded from scored results.')
                     continue
-                outcome = read_outcome()
+                outcome = read_outcome(require_recovery=is_recovery)
                 recorder({**common, **motion, **outcome, 'completed': True})
             except BaseException as exc:
                 recorder({**common, 'completed': False, 'reason': 'interrupted' if isinstance(exc, KeyboardInterrupt) else 'error',
