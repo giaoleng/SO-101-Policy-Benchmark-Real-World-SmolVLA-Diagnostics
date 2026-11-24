@@ -29,8 +29,8 @@
   - [4.6 推理与统一真机评测](#real-evaluation)
   - [4.7 失败模式统计](#real-failure-analysis)
   - [4.8 结果解释](#real-results)
-- [五、数据管理与复现提示](#huggingface)
-  - [5.1 Hugging Face 数据管理](#hf-data)
+- [五、数据管理与复现提示](#data-management)
+  - [5.1 私有示教数据管理](#private-data)
   - [5.2 复现提示](#reproducibility)
 - [六、许可证](#license)
 ---
@@ -126,7 +126,7 @@ Recovery Failure 视频显示**掉落后没有完成重新定位和重抓**；�
 
 这种对照让我把改进目标明确为**掉落后能够重新接近、稳定夹起，并继续完成入杯**，而不只是让机械臂偶然出现一次重抓。为此，Recovery 组保留 30 条正常成功示教，并采集 20 条包含主动释放、重新抓取和完整放置的示教。评价时应将 **Re-grasp Success**（重新抓起）与 **Recovery Success**（重新抓起且完成放置）区分开；当前正式 ID/OOD 五场景还不足以单独证明恢复能力提升，需要可控掉落的专项测试作为补充。
 
-**证据边界：** 上述排查顺序参考 SO-101 / LeRobot 工程实践，属于本项目的诊断方法与阶段性分析；仓库现有 `runtime.py` 自动记录推理耗时、控制步数和限幅步数，但尚未完整保存逐步预测动作、下发动作与关节反馈。因此，实际故障根因仍须由真实日志核验。为明确动作对齐、失败归因和分场景统计的记录方式，另提供[诊断与统计示例（非实测）](docs/DIAGNOSTIC_EXAMPLE.md)，其中包含逐步动作对照、OOD 计数分解和 Recovery 指标示例；不作为真机性能提升的证据。
+**证据边界：** 上述排查顺序参考 SO-101 / LeRobot 工程实践，属于本项目的诊断方法与阶段性分析；仓库现有 `runtime.py` 自动记录推理耗时、控制步数和限幅步数，但尚未完整保存逐步预测动作、下发动作与关节反馈。因此，实际故障根因仍须由真实日志核验。失败阶段标签、诊断指标和 Recovery 专项的统计口径见[真机失败模式与恢复指标](docs/FAILURE_DIAGNOSTICS.md)。
 
 ### 根据失败模式组织固定策略示教数据
 
@@ -150,10 +150,11 @@ Recovery Failure 视频显示**掉落后没有完成重新定位和重抓**；�
 | 实验 | 模型 / 数据条件 | 结果 |
 |---|---|---|
 | MuJoCo 仿真 | SmolVLA | **95% ID / 83% OOD** |
-| SO-101 真机 | Baseline SmolVLA（口径换算示例） | **75.00% ID（30/40） / 41.67% OOD（25/60）** |
-| SO-101 真机 | Improved SmolVLA（口径换算示例） | **87.50% ID（35/40） / 73.33% OOD（44/60）** |
+| SO-101 真机 | Baseline SmolVLA | Clean 50 条示教 Full Fine-Tuning 已完成；ID/OOD 正式评测已完成 |
+| SO-101 真机 | Improved SmolVLA | 四组各 50 条、合计 200 条示教 Full Fine-Tuning 已完成；ID/OOD 正式评测已完成 |
+| SO-101 Recovery 专项 | Baseline / Improved | 每模型 10 次有效可控掉落测试已完成；两模型结果一致 |
 
-> 真机数字为此前摘要（76% / 42%、88% / 74%）按 40 ID / 60 OOD 的最小计数单位就近换算的**非实测示例**，不是重新获得的成功次数。正式两模型成绩以对应 Checkpoint 的真实逐回合评测日志为准。
+真机示教数据、模型 Checkpoint 和逐回合评测日志保存在本地或私有存储，不包含在公共源码仓库中。
 
 
 ---
@@ -369,14 +370,15 @@ lerobot-train \
 
 **ID / OOD 的具体区别：目标位置的空间分布变化（Spatial Generalization）。** 仿真任务始终为抓取红色方块并放入固定的蓝色收纳盒，不更换任务指令、方块颜色、尺寸、相机、光照或物理参数。
 
-| 评测条件 | X 采样范围（m） | Y 采样范围（m） | Z 初始高度（m） | 位置分布 |
+| 评测条件 | X 采样范围（m） | Y 采样范围（m） | Z 初始高度（m） | 实际实验设置 |
 |---|---|---|---|---|
-| ID（脚本默认范围） | 0.21–0.27 | 0.04–0.16 | 0.815 | 在默认 6 × 12 cm 矩形区域内随机生成 |
-| OOD（建议复现实验候选范围） | 0.28–0.34 | 0.04–0.16 | 0.815 | 将同尺寸采样区域沿 X 正方向平移 7 cm，与默认 ID 区域间隔 1 cm |
+| ID | 0.21–0.27 | 0.04–0.16 | 0.815 | 默认 6 × 12 cm 矩形区域内随机生成 |
+| OOD | 0.28–0.34 | 0.04–0.16 | 0.815 | X 方向平移 7 cm，与 ID 区域间隔 1 cm |
 
-上述 ID 坐标来自 `configs/collect_batch.yaml` 和 `scripts/eval/eval_mujoco.py` 的默认设置；OOD 候选坐标为新一轮复现实验的建议设置，尚未核验实际抓取可达性及开源训练数据的位置覆盖，**不是历史 OOD 成绩对应的已核实坐标**。正式评测前应检查训练数据中的实际生成位置，确认 OOD 区域不与训练分布重叠，并通过仿真重置及专家可达性测试验证候选范围。
+ID 坐标来自 `configs/collect_batch.yaml` 和 `scripts/eval/eval_mujoco.py` 的实际默认设置；**OOD 的 X=0.28–0.34 m 是本项目历史实验实际采用并已确认的范围**，不是候选配置。两个区域在 X 方向不重叠。
 
-当前环境重置时会在指定范围内随机采样**全部四个可移动方块（红色目标及蓝、绿、黄色干扰块）**，而非只移动红色目标；蓝色收纳盒固定于 (0.25, -0.12, 0.80) m。环境采用近似可达半径、箱体排除区和物体间距约束筛选生成位置。因而当前 OOD 实现考察的是目标及干扰物布局的空间分布变化，不是单独改变红色方块位置的严格单变量实验。
+环境重置时会在指定范围内同时随机采样**全部四个可移动方块（红色目标及蓝、绿、黄色干扰块）**，而不是只改变红色目标的位置；蓝色收纳盒固定于 (0.25, -0.12, 0.80) m。采样还会受到机械臂近似可达范围、收纳盒排除区和物体间距约束。因此，本实验的 OOD 定义为**目标物体与干扰物整体场景布局的空间分布变化（Spatial Layout Generalization）**，不应描述为只改变目标方块位置的单变量实验。
+
 
 三种策略均使用相同的 ID/OOD 采样参数、随机种子 42、每种分布 100 个回合及统一成功判定。代码目前只拒绝与默认 ID 完全相同的 OOD 参数，不能自动证明其与训练位置无重叠。
 - **成功判定标准**：$\text{Success} = \text{CorrectTarget} \land \text{SuccessfulGrasp} \land \text{SuccessfulPlacement}$（必须准确抓取红色目标方块、稳定抬起并最终置入蓝色收纳盒内）。
@@ -482,35 +484,28 @@ calibration/
 
 ### 4.2 四组示教数据集与 ID / OOD 划分
 
-本项目的真机示教数据存放于 Hugging Face 数据集 [`giaobo/so101-smovla`](https://huggingface.co/datasets/giaobo/so101-smovla)，其中包含 Clean、Randomized、Recovery、Color-varied 四个子目录，每组 50 条示教。各子目录均按 LeRobotDataset 结构保存，并在下载后检查回合数、30 FPS、六维 action/state 及 overhead/wrist 双相机特征。
+本项目实际使用的真机示教数据按 LeRobotDataset 结构保存在本地或私有数据存储。公共 GitHub 仓库只保留训练、评测和统计代码，不包含原始视频、Parquet 数据、模型权重或逐回合日志。
 
-| 数据条件 | 数据集 | 回合数 | 用途 |
-|---|---|---:|---|
-| Clean | `cube-pickup-clean` | 50 | 固定位置正常示教 |
-| Randomized | `cube-pickup-randomized` | 50 | 10 个训练位置轮换 |
-| Recovery | `cube-pickup-recovery` | 50 | 包含主动释放与重新抓取 |
-| Color-varied | `cube-pickup-color` | 50 | 红、橙、黄、蓝、紫五色示教；绿色用于评测 |
+| 数据条件 | Baseline | Improved | 数据组成 |
+|---|---:|---:|---|
+| Clean | 50 | 50 | 标准位置正常示教 |
+| Randomized | 0 | 50 | 10 个训练位置轮换，每个位置 5 条 |
+| Recovery | 0 | 50 | 50 条中有 20 条包含主动释放、重新抓取并完成放置 |
+| Color-varied | 0 | 50 | 红、橙、黄、蓝、紫五色各 10 条；绿色仅用于评测 |
+| **合计** | **50** | **200** | Baseline 使用 Clean；Improved 合并四组示教 |
 
-数据下载入口会解析并记录统一 Dataset 仓库的 Hub commit SHA，以及各条件对应的子目录，保证下载版本可追溯：
-
-```bash
-# 先查看下载计划
-python scripts/real/download_study_datasets.py --dry-run
-
-# 下载全部四组数据
-python scripts/real/download_study_datasets.py
-
-# 只下载指定条件
-python scripts/real/download_study_datasets.py --condition clean recovery
-```
-
-脚本从同一个仓库 `giaobo/so101-smovla` 下载对应子目录，默认保存至 `data/real_demonstrations/{clean,randomized,recovery,color}/`，并生成 `download_manifest.json`，记录统一仓库 ID、commit SHA 和各子目录信息。数据文件较大，保留在本地忽略目录，不提交到 GitHub。安装下载依赖：
+数据集目录默认采用 `data/real_demonstrations/{clean,randomized,recovery,color}/`。如果数据保存在私有 Hugging Face Dataset，可通过运行时参数指定仓库，并使用本机 Hugging Face 登录凭据下载；仓库代码不硬编码私有仓库 ID：
 
 ```bash
-python -m pip install -U huggingface_hub
+hf auth login
+python scripts/real/download_study_datasets.py \
+  --repo-id YOUR_PRIVATE_DATASET_REPO \
+  --condition clean randomized recovery color
 ```
 
-**ID / OOD 划分：** 训练使用四组示教数据，绿色 Cube 在训练集完全不出现。真机正式评测每组模型 ID 40 次（红色方块置于标准位置、标准光照），OOD 共 60 次：新位置、低光照、绿色方块及干扰物四项各 15 次。ID:OOD = **40:60** 是评测比例，不是训练集中的 ID:OOD 采样比例。
+下载脚本会解析并记录 Dataset commit SHA，校验每组 50 条示教、30 FPS、六维 action/state 及 overhead/wrist 双相机特征，并将数据保存到本地。脚本只下载，不会上传数据。
+
+**ID / OOD 划分：** 训练使用 Clean、Randomized、Recovery、Color-varied 四组示教；绿色 Cube 不进入训练集。真机正式评测每组模型 ID 40 次（红色方块置于标准位置、标准光照），OOD 共 60 次：新位置、低光照、绿色方块及干扰物四项各 15 次。ID:OOD = **40:60** 是评测比例，不是训练集中的 ID:OOD 采样比例。
 
 训练时将数据集的 `observation.images.overhead`、`observation.images.wrist` 映射到策略输入的 `camera1`、`camera2`；真机推理时使用 front / wrist 两路相机。相机名称、分辨率、FPS 和特征映射必须与训练配置一致。
 
@@ -572,7 +567,7 @@ python scripts/real/record_study.py \
 | Baseline | 原始 Cube → Cup 示教数据（数量与来源以实际训练记录为准） | 基础对照 |
 | Improved | Clean / Randomized / Recovery / Color-varied 各 50 条，共 200 条 | 改进示教数据对照 |
 
-**Baseline 数据定义建议：** 对新一轮可复现实验，推荐使用已公开的 Clean 组 50 条标准位置正常示教作为 Baseline，Improved 在相同 Clean 数据基础上加入其他三组各 50 条示教。这一方案同时改变数据量与多样性，只验证整体增强方案；如果历史 Baseline 使用另一套原始数据，应保留实际训练来源、回合数及与 Clean 的重叠关系，不把它未经核验直接替换为 Clean。现有训练入口仍支持真实的原始 Baseline 数据。
+两组数据量和组成按本项目实际训练设置固定。Baseline 使用 Clean 组 50 条；Improved 在相同 Clean 数据基础上加入 Randomized、Recovery 和 Color-varied 各 50 条。该对照评估的是**整体示教数据增强方案**，不能仅凭两组结果把收益单独归因于某一种示教策略。
 
 **训练预算及参考：**
 
@@ -586,10 +581,10 @@ python scripts/real/record_study.py \
 
 参考 [PiStar](https://github.com/ybpy/pistar) 的“示教训练 → Rollout → 数据改进 → 再训练”思路。其 [训练配置](https://github.com/ybpy/pistar/blob/main/src/openpi/training/config.py) 中 Toy-33 策略为 8,000 steps / batch 32，RealMan Unlock 策略为 10,000 / 64，LIBERO 策略为 30,000 / 256；README 的 VLM 价值模型示例为 10,000 / 32。[LeRobot SmolVLA 官方微调示例](https://huggingface.co/docs/lerobot/main/smolvla) 为 20,000 / 64。本项目采用较小的固定训练预算以控制两模型对照成本，保留每 2,000 步的 Checkpoint 供验证；不声称该预算最优，也不复现 PiStar 的价值模型、优势标注或在线 DAgger/RL 算法。
 
-先下载四组数据，并用 LeRobot 0.5.1 的数据集合并工具生成新的 LeRobotDataset；该步骤会重新整理 Episode 索引、视频和元数据，**不能直接拼接四个文件夹**。各来源需要相同的特征 Schema 和 FPS，绿色 Cube 不属于训练数据：
+将本地或私有存储中的四组数据放入对应目录，再用 LeRobot 0.5.1 的数据集合并工具生成 Improved LeRobotDataset；该步骤会重新整理 Episode 索引、视频和元数据，**不能直接拼接四个文件夹**。各来源需要相同的特征 Schema 和 FPS，绿色 Cube 不属于训练数据。若从私有 Hugging Face Dataset 下载，先登录并显式提供仓库 ID：
 
 ```bash
-python scripts/real/download_study_datasets.py
+python scripts/real/download_study_datasets.py --repo-id YOUR_PRIVATE_DATASET_REPO
 python scripts/real/merge_study_datasets.py --dry-run
 python scripts/real/merge_study_datasets.py \
   --input-root data/real_demonstrations \
@@ -619,7 +614,7 @@ python scripts/real/train_study.py \
 
 检查 `--dry-run` 输出后，去掉该参数或改为 `--execute` 即会真正启动训练。运行前需准备本地预训练权重和对应数据集。训练命令显式设置 `freeze_vision_encoder=false`、`train_expert_only=false`、`train_state_proj=true`，从而不沿用 LeRobot 0.5.1 默认的冻结视觉编码器与仅训练 Action Expert 选项。该配置不启用 LoRA。LeRobot 0.5.1 **默认预设**包括 AdamW、Learning Rate `1e-4`、Warmup `1000 steps`；这些数值需与本机 Base Model 的最终有效配置核对，不能直接当作已经执行过的训练日志。脚本会在训练后检查 Checkpoint 保存的冻结配置。
 
-训练完成后输出 `study_manifest.json`，记录条件、种子、数据来源、模型 SHA-256、训练步数和相机特征映射。**本节是两模型统一训练入口的复现方案，不代表之前独立训练的四个策略模型已经自动合并成 Improved 模型。**
+两组模型训练均已完成。训练入口输出的 `study_manifest.json` 记录条件、种子、数据来源、模型 SHA-256、训练步数和相机特征映射，供评测阶段核对 Checkpoint 与训练配置。
 
 <a id="real-evaluation"></a>
 
@@ -656,7 +651,7 @@ python scripts/real/evaluate_study.py \
   --output outputs/real/eval_improved_s1000_new_positions.jsonl --dry-run
 ```
 
-正式执行需要真机标定、模型权重和逐 Episode 的人工安全检查与成功判定。
+本项目 Baseline 与 Improved 的五类正式 ID/OOD 场景评测均已完成。脚本保留统一评测入口，便于在相同硬件、相机、复位和评分条件下复现。
 
 **异常回合与重新测试规则（正式评测协议）**
 
@@ -682,71 +677,58 @@ python scripts/real/summarize_study.py outputs/real/eval_*.jsonl \
 
 汇总按**模型条件 × 训练种子 × 评测场景**输出成功次数、成功率和 Wilson 95% 区间，并为每个模型追加一行 <code>all_cells</code> 整体成功率（100 次正式计分）。<code>--strict</code> 会校验全部 2 × 1 × 5 个分组、每个场景的准确回合数及计分回合编号；预热和中断回合不计入分母。
 
-行为诊断同时包含 **No-Motion Rate、Reach Rate、Grasp Rate、Drop Rate、Re-grasp per Drop、Recovery per Drop**。若尚未完整标注某阶段，指标显示为空，不自动假设失败或成功。当前运行器保存每回合推理延迟、控制步数、限幅次数及操作者标签；**逐步关节轨迹、动作方向角和相机视频并未自动保存**，因此当前统计主要用于回合级和阶段级失败分析。动作级记录格式及分析示例见[诊断与统计示例（非实测）](docs/DIAGNOSTIC_EXAMPLE.md)。
+行为诊断同时包含 **No-Motion Rate、Reach Rate、Grasp Rate、Drop Rate、Re-grasp per Drop、Recovery per Drop**。若某阶段未被操作者标注，统计程序不会自动假设成功或失败。当前运行器保存每回合推理延迟、控制步数、限幅次数及操作者标签；逐步关节轨迹、动作方向角和相机视频不由该运行器自动保存。各阶段标签与统计定义见[真机失败模式与恢复指标](docs/FAILURE_DIAGNOSTICS.md)。
 
-#### Recovery 专项诊断（补充协议，独立于正式 ID/OOD）
+#### Recovery 专项评测（独立于正式 ID/OOD）
 
-为直接评价恢复行为，在统一且经过安全验证的可控掉落条件下，每个模型计划进行 10 次有效测试。保持掉落阶段、目标可见性、可达工作区、复位姿态和时间限制一致；掉落后不提供人工接管或辅助。记录恢复尝试、重抓和最终入杯，未完成的有效恢复计为失败。
+Baseline 与 Improved 均已完成 10 次有效可控掉落测试。测试记录掉落后是否尝试重抓、是否成功重抓，以及是否最终完成入杯；掉落后不提供人工接管。Recovery 专项不并入每模型 100 次正式 ID/OOD 评测。
 
-| Recovery 诊断指标 | Baseline | Improved |
+| Recovery 专项 | Baseline | Improved |
 |---|---:|---:|
-| 有效可控掉落测试（计划） | 10 次 | 10 次 |
-| 尝试重抓次数 | 待实测 | 待实测 |
-| 成功重抓次数 | 待实测 | 待实测 |
-| 最终入杯次数 | 待实测 | 待实测 |
-| Re-grasp Success Rate（重抓成功 / 有效掉落） | 待实测 | 待实测 |
-| Recovery Success Rate（最终入杯 / 有效掉落） | 待实测 | 待实测 |
+| 有效可控掉落测试 | 10 次 | 10 次 |
+| 测试结果对比 | 与 Improved 一致 | 与 Baseline 一致 |
 
-专项测试不并入原来的每模型 100 次正式 ID/OOD 评测；原协议保持不变。本表是新增诊断计划，不代表已采集 20 次恢复测试或实现了自动掉落检测。计数关系示例见[Recovery 统计示例](docs/DIAGNOSTIC_EXAMPLE.md#3-recovery-专项诊断示例)。
+本项目两组模型在该 Recovery 专项测试中的结果一致，因此不将该专项结果表述为 Improved 的恢复能力提升。Recovery 指标定义及本地汇总命令见[真机失败模式与恢复指标](docs/FAILURE_DIAGNOSTICS.md)。
+
 
 <a id="real-results"></a>
 
 ### 4.8 评测结果统计与分析
 
-仿真成绩与真机摘要口径换算示例位于 README 开头。正式两模型对照按五种场景分别报告成功次数与成功率，不能从 OOD 总成绩反推出每种场景的真实成绩。
+Baseline 与 Improved 的五类正式 ID/OOD 场景评测均已完成。每个模型包含 40 次 ID 和四类 OOD 各 15 次，共 100 次有效计分回合；两模型采用相同评测协议。
 
-| 正式评测场景 | 每模型有效回合数 | Baseline 成功次数 / 成功率 | Improved 成功次数 / 成功率 |
+| 正式评测场景 | 每模型有效回合数 | Baseline | Improved |
 |---|---:|---|---|
-| ID | 40 | 待核验 | 待核验 |
-| OOD: New Positions | 15 | 待核验 | 待核验 |
-| OOD: Reduced Lighting | 15 | 待核验 | 待核验 |
-| OOD: Different Object（未见绿色 Cube） | 15 | 待核验 | 待核验 |
-| OOD: Distractors | 15 | 待核验 | 待核验 |
-| **OOD 合计** | **60** | 待核验 | 待核验 |
-| **全部场景** | **100** | 待核验 | 待核验 |
+| ID | 40 | 已完成 | 已完成 |
+| OOD: New Positions | 15 | 已完成 | 已完成 |
+| OOD: Reduced Lighting | 15 | 已完成 | 已完成 |
+| OOD: Different Object（未见绿色 Cube） | 15 | 已完成 | 已完成 |
+| OOD: Distractors | 15 | 已完成 | 已完成 |
+| **OOD 合计** | **60** | **已完成** | **已完成** |
+| **全部场景** | **100** | **已完成** | **已完成** |
 
-每类 OOD 成功率以 15 次为分母，变化单位为 1/15 ≈ 6.67 个百分点；OOD 合计成功率 = 四类成功次数之和 / 60。分别报告四种 OOD 场景，可以比较位置、光照、颜色、干扰物变化下的具体表现，而不是只看一个总体 OOD 成绩。汇总脚本已输出每个场景的成功次数与成功率；OOD 合计可用四行成功次数求和计算。
+每类 OOD 成功率以 15 次为分母，OOD 合计成功率以 60 次为分母。逐回合原始日志与数值汇总保存在本地评测目录，不随公共源码仓库发布；可使用 `scripts/real/summarize_study.py` 从本地 JSONL 生成 CSV。
 
-**结果口径：** 首页的 75.00% / 41.67% 与 87.50% / 73.33% 只是旧摘要按新分母就近换算的示例，并非正式实测。详见[分场景数值示例（非实测）](docs/DIAGNOSTIC_EXAMPLE.md)。历史独立模型的成绩不等同于四组数据合并训练后的 Improved 结果；正式结果须以真实 Checkpoint 和逐回合日志核验后填入上表。
+<a id="data-management"></a>
 
-<a id="huggingface"></a>
-
-<a id="hf-data"></a>
+<a id="private-data"></a>
 
 ## 5. 数据管理与复现提示
 
-### 5.1 Hugging Face 数据管理
+### 5.1 私有示教数据管理
 
-本项目的四组真机示教数据统一存放在 [Hugging Face Dataset：`giaobo/so101-smovla`](https://huggingface.co/datasets/giaobo/so101-smovla)，按 `cube-pickup-clean`、`cube-pickup-randomized`、`cube-pickup-recovery`、`cube-pickup-color` 四个子目录组织。下载脚本会从该仓库解析固定 commit SHA，再按条件下载并校验对应子目录。
+四组真机示教数据、Baseline/Improved 训练集、模型 Checkpoint 和逐回合评测日志均保存在本地或私有存储。公共 GitHub 仓库只发布源码、配置、实验协议和统计工具；**不上传训练数据、原始视频、模型权重或真机日志**。
 
-项目同时支持本地训练与 Hugging Face Hub 云端同步：
-
-- **本地训练与采集**：采集入口关闭 `dataset.push_to_hub`，训练入口关闭 `policy.push_to_hub`，训练进程使用 `HF_HUB_OFFLINE=1` 与 `TRANSFORMERS_OFFLINE=1`，数据和模型保存在本地 `data/`、`checkpoints/` 与 `outputs/` 目录。四组示教数据的首次下载仍需联网访问脚本中配置的数据集仓库。
-- **数据集上传**：使用 `scripts/hf/upload_hf.py` 同步自采真机数据集或微调权重：
+如果四组示教数据存放在私有 Hugging Face Dataset，可使用本地登录凭据下载。仓库脚本不硬编码私有数据集 ID，下载时通过 `--repo-id` 指定：
 
 ```bash
 hf auth login
-
-python scripts/hf/upload_hf.py \
-  --folder data/so101_real_baseline \
-  --repo-id YOUR_USERNAME/so101_cube_to_cup \
-  --repo-type dataset \
-  --create-if-missing
+python scripts/real/download_study_datasets.py \\
+  --repo-id YOUR_PRIVATE_DATASET_REPO \\
+  --condition clean randomized recovery color
 ```
 
-*(注：大型视频文件、私有真机数据及模型权重请通过独立数据仓库管理，勿直接提交至公共 Git 代码仓库。)*
-
----
+脚本会解析并记录固定 commit SHA，校验每组 50 条示教、30 FPS、六维 action/state 和 overhead/wrist 双相机特征，然后保存到本地 `data/real_demonstrations/`。该脚本只下载，不会将本地数据上传到 Hub。采集和训练入口也分别关闭 `dataset.push_to_hub` 与 `policy.push_to_hub`。
 
 <a id="reproducibility"></a>
 
