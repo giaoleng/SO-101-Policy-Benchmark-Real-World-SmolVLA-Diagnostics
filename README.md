@@ -367,8 +367,18 @@ lerobot-train \
 
 评测阶段彻底脱离任何专家控制器，由策略权重根据实时观测独立输出 Action Chunk 并在 MuJoCo 中闭环执行。
 
-- **分布内测试（ID）**：红色方块在训练集覆盖的工作空间范围内随机生成，检验基础抓取放置精度。
-- **分布外测试（OOD）**：红色方块在训练集未覆盖、但处于 SO-101 可达工作空间且不与箱体碰撞的区域内随机生成（保持光照、物体尺寸与物理参数不变），检验策略对未见目标位置的空间泛化能力。
+**ID / OOD 的具体区别：目标位置的空间分布变化（Spatial Generalization）。** 仿真任务始终为抓取红色方块并放入固定的蓝色收纳盒，不更换任务指令、方块颜色、尺寸、相机、光照或物理参数。
+
+| 评测条件 | X 采样范围（m） | Y 采样范围（m） | Z 初始高度（m） | 位置分布 |
+|---|---|---|---|---|
+| ID（脚本默认范围） | 0.21–0.27 | 0.04–0.16 | 0.815 | 在默认 6 × 12 cm 矩形区域内随机生成 |
+| OOD（建议复现实验候选范围） | 0.28–0.34 | 0.04–0.16 | 0.815 | 将同尺寸采样区域沿 X 正方向平移 7 cm，与默认 ID 区域间隔 1 cm |
+
+上述 ID 坐标来自 `configs/collect_batch.yaml` 和 `scripts/eval/eval_mujoco.py` 的默认设置；OOD 候选坐标为新一轮复现实验的建议设置，尚未核验实际抓取可达性及开源训练数据的位置覆盖，**不是历史 OOD 成绩对应的已核实坐标**。正式评测前应检查训练数据中的实际生成位置，确认 OOD 区域不与训练分布重叠，并通过仿真重置及专家可达性测试验证候选范围。
+
+当前环境重置时会在指定范围内随机采样**全部四个可移动方块（红色目标及蓝、绿、黄色干扰块）**，而非只移动红色目标；蓝色收纳盒固定于 (0.25, -0.12, 0.80) m。环境采用近似可达半径、箱体排除区和物体间距约束筛选生成位置。因而当前 OOD 实现考察的是目标及干扰物布局的空间分布变化，不是单独改变红色方块位置的严格单变量实验。
+
+三种策略均使用相同的 ID/OOD 采样参数、随机种子 42、每种分布 100 个回合及统一成功判定。代码目前只拒绝与默认 ID 完全相同的 OOD 参数，不能自动证明其与训练位置无重叠。
 - **成功判定标准**：$\text{Success} = \text{CorrectTarget} \land \text{SuccessfulGrasp} \land \text{SuccessfulPlacement}$（必须准确抓取红色目标方块、稳定抬起并最终置入蓝色收纳盒内）。
 
 使用统一评测脚本 `scripts/eval/eval_mujoco.py` 运行三类模型并导出结构化 JSONL 与 CSV 统计：
@@ -390,7 +400,7 @@ python scripts/eval/eval_mujoco.py \
   --timeout-clock sim \
   --output outputs/eval/act_id_seed42.jsonl
 
-# 运行分布外（OOD）闭环评测（需显式指定分布外生成边界）
+# OOD 候选范围示例：先验证训练分布不重叠及实际可达性再执行
 python scripts/eval/eval_mujoco.py \
   --policy smolvla \
   --checkpoint /path/to/smolvla/pretrained_model \
@@ -401,8 +411,8 @@ python scripts/eval/eval_mujoco.py \
   --processors saved \
   --device cuda \
   --split ood \
-  --spawn-x-min <X_MIN> --spawn-x-max <X_MAX> \
-  --spawn-y-min <Y_MIN> --spawn-y-max <Y_MAX> \
+  --spawn-x-min 0.28 --spawn-x-max 0.34 \
+  --spawn-y-min 0.04 --spawn-y-max 0.16 \
   --num-trials 100 \
   --seed 42 \
   --timeout-clock sim \
