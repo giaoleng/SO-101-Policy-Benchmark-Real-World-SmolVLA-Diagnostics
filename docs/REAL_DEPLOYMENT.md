@@ -1,78 +1,77 @@
 # SO-101 真机 SmolVLA 训练与评测
 
-## 模型对照
+## 实验状态
 
-统一使用同一个 SmolVLA 全参数微调入口，区分两组训练数据：
+Baseline 与 Improved 两组 SmolVLA 均已完成训练和正式真机评测；独立 Recovery 专项测试也已完成。
 
-| 模型 | 训练数据 | 目的 |
-|---|---|---|
-| Baseline | 原始 Cube → Cup 示教 | 基础对照 |
-| Improved | Clean + Randomized + Recovery + Color-varied，共 200 条 | 展示多样化及恢复示教数据的影响 |
+## 数据组成
 
-四组增强示教由 Hugging Face Dataset [`giaobo/so101-smovla`](https://huggingface.co/datasets/giaobo/so101-smovla) 提供，分别位于 `cube-pickup-clean`、`cube-pickup-randomized`、`cube-pickup-recovery`、`cube-pickup-color` 子目录，绿色 Cube 不进入训练集。
+| 数据条件 | Baseline | Improved | 数据组成 |
+|---|---:|---:|---|
+| Clean | 50 | 50 | 标准位置正常示教 |
+| Randomized | 0 | 50 | 10 个训练位置轮换，每个位置 5 条 |
+| Recovery | 0 | 50 | 其中 20 条包含主动释放、重新抓取并完成放置 |
+| Color-varied | 0 | 50 | 红、橙、黄、蓝、紫五色各 10 条；绿色仅用于评测 |
+| **合计** | **50** | **200** | Baseline 使用 Clean；Improved 合并四组 |
 
-## 硬件与安全
-
-正式采集或评测前，需完成 [硬件部署指南](REAL_HARDWARE_SETUP.md) 的校准与安全检查。配置 `configs/real/so101.yaml` 默认将 `robot.hardware_confirmed` 设为 `false`；硬件校准完成后才能在本机启用。软件停止文件不能替代物理急停。
-
-## 数据下载与合并
+训练数据、原始视频、Parquet 文件、模型权重和逐回合日志保存在本地或私有存储，不提交到公共 GitHub 仓库。若示教数据存放于私有 Hugging Face Dataset，先登录，再运行：
 
 ```bash
-python scripts/real/download_study_datasets.py
-python scripts/real/merge_study_datasets.py --dry-run
-python scripts/real/merge_study_datasets.py \
-  --input-root data/real_demonstrations \
-  --output data/real_so101_improved \
-  --repo-id local/so101_improved
+hf auth login
+python scripts/real/download_study_datasets.py --repo-id YOUR_PRIVATE_DATASET_REPO --condition clean randomized recovery color
 ```
 
-LeRobot 0.5.1 的合并工具会处理 Episode 重编号、视频和元数据。源数据需要相同 Schema / FPS。合并脚本拒绝覆盖已有输出目录。
+下载脚本在运行时接收仓库 ID，记录解析后的 commit SHA，并校验每组 50 条、30 FPS、六维 action/state 和双相机特征；不会上传数据。
 
 ## Full Fine-Tuning
 
-统一训练种子 1000、10,000 steps、batch size 32，每隔 2,000 steps 保存 Checkpoint。训练命令显式设置 `freeze_vision_encoder=false`、`train_expert_only=false`、`train_state_proj=true`，不使用 LoRA。LeRobot 0.5.1 默认预设为 AdamW、Learning Rate `1e-4`、Warmup `1000 steps`，实际生效值请核对 Base Model 配置及训练日志。
+两组训练使用相同 SmolVLA 基础权重、Seed 1000、10,000 steps、Batch Size 32，每隔 2,000 steps 保存 Checkpoint。训练命令显式设置 `freeze_vision_encoder=false`、`train_expert_only=false`、`train_state_proj=true`，不使用 LoRA。
+
+| 模型 | 数据集 | 实际规模 |
+|---|---|---:|
+| Baseline | Clean | 50 |
+| Improved | Clean + Randomized + Recovery + Color-varied | 200 |
+
+统一训练入口为 `scripts/real/train_study.py`。脚本会校验 Baseline 必须为 50 条、Improved 必须为 200 条，并在训练后保存 `study_manifest.json`，记录训练配置、数据来源、Checkpoint SHA-256 和相机特征映射。
+
+## 正式 ID/OOD 评测
+
+两组模型均已完成以下正式评测。每个模型 40 次 ID、四类 OOD 各 15 次，共 100 次有效计分回合；每个正式场景另有一次不计分预热。
+
+| 场景 | 每模型有效次数 | 测试条件 |
+|---|---:|---|
+| ID | 40 | 红色 Cube 标准位置、标准光照 |
+| OOD: New Positions | 15 | 训练位置之外的新位置 |
+| OOD: Reduced Lighting | 15 | 标准位置、低光照 |
+| OOD: Different Object | 15 | 绿色 Cube，仅用于评测 |
+| OOD: Distractors | 15 | 标准位置，增加干扰物 |
+
+评测入口为 `scripts/real/evaluate_study.py`，正式汇总入口为 `scripts/real/summarize_study.py`。正式评测原始 JSONL 和 CSV 保存在本地，不提交到公共仓库。
+
+## Recovery 专项评测
+
+Recovery 专项与正式 ID/OOD 评测分开进行。Baseline 和 Improved 均已完成 10 次有效可控掉落测试，记录掉落后重抓尝试、重抓结果和最终入杯结果。两组模型在该专项测试中的结果一致，不据此声称 Improved 的恢复能力有所提升。
+
+生成专项测试计划：
 
 ```bash
-# Baseline，先检查命令
-python scripts/real/train_study.py \
-  --condition baseline --seed 1000 \
-  --dataset-root data/real_so101_baseline \
-  --repo-id local/so101_baseline \
-  --base-model /path/to/local/smolvla_base \
-  --output outputs/train/real_baseline_seed1000 --dry-run
-
-# Improved，先检查命令
-python scripts/real/train_study.py \
-  --condition improved --seed 1000 \
-  --dataset-root data/real_so101_improved \
-  --repo-id local/so101_improved \
-  --base-model /path/to/local/smolvla_base \
-  --output outputs/train/real_improved_seed1000 --dry-run
+python scripts/real/study_protocol.py --phase recovery --condition baseline
+python scripts/real/study_protocol.py --phase recovery --condition improved
 ```
 
-检查后改为 `--execute` 才执行真实训练。训练产物包括 Checkpoint 与用于核验的 `study_manifest.json`。
+运行 Recovery 专项评测时，使用 `scripts/real/evaluate_study.py --cell recovery`。该协议要求每个有效回合均确认发生可控掉落，并记录 `regrasp_attempted`、`regrasped`、`placed` 和 `success`；其中 `success` 必须表示重抓后最终入杯。
 
-## 统一真机评测
-
-每个模型 ID 40 次，OOD 四场景分别 15 次，共 100 次正式计分，另有 5 次预热。两模型总计 200 次正式计分加 10 次预热。成功结果由操作者按任务完成条件人工核验；回合失败模式和控制日志由工具记录。
+对本地 Recovery JSONL 进行汇总：
 
 ```bash
-python scripts/real/study_protocol.py --phase evaluate --cell in_distribution
-
-python scripts/real/evaluate_study.py \
-  --condition improved --seed 1000 --cell in_distribution \
-  --checkpoint outputs/train/real_improved_seed1000/checkpoints/010000/pretrained_model \
-  --training-manifest outputs/train/real_improved_seed1000/study_manifest.json \
-  --output outputs/real/eval_improved_s1000_id.jsonl --dry-run
-
-python scripts/real/summarize_study.py outputs/real/eval_*.jsonl \
-  --csv outputs/real/study_summary.csv --strict
+python scripts/real/summarize_recovery.py \
+  --baseline outputs/real/recovery_baseline.jsonl \
+  --improved outputs/real/recovery_improved.jsonl \
+  --csv outputs/real/recovery_summary.csv
 ```
 
-模型推理由 `RealPolicyRunner` 加载真实 Checkpoint，调用 `policy.select_action(...)`。目前配置的控制频率为 20 Hz，最长回合 45 秒，最多 900 个控制步，推理超时 1 秒。LeRobot 0.5.1 默认预设 `num_steps=10`、`chunk_size=50`、`n_action_steps=50`，实际数值由加载的 Checkpoint 配置决定；评测脚本不覆盖。
+Recovery 专项统计与正式 ID/OOD 统计分开保存，不混入每模型 100 次正式评测分母。
 
-## 结果口径
+## 控制与安全
 
-README 首页展示按历史摘要就近换算的整数计数示例（明确标为非实测），不是两模型新协议下的正式成绩。已有四组独立训练和评测也不等价于 Improved 使用 200 条合并数据的训练；实际获得相应 Checkpoint 与评测日志后，才能形成新方案的正式对照结果。
-
-补充协议：每类 OOD 独立报告 15 次有效回合的成功次数；Recovery 专项计划每模型 10 次有效掉落，不计入正式 ID/OOD。异常回合按 [README 评测规则](../README.md#real-evaluation) 审核：有效策略失败必须计分，只有经核验的外部故障或布场错误允许补测；不删除原记录。统计演示见 [DIAGNOSTIC_EXAMPLE.md](DIAGNOSTIC_EXAMPLE.md)。
+模型推理由 `RealPolicyRunner` 加载对应 Checkpoint 并调用 `policy.select_action(...)`。当前配置为 20 Hz 控制频率、45 秒单回合上限、最多 900 个控制步、推理超时 1 秒。正式部署前仍须在本机完成机械臂标定、关节限位、相机、停止入口和实体急停检查；公共配置默认不启用真机硬件。
