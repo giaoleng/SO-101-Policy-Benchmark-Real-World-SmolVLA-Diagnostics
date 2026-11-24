@@ -52,14 +52,30 @@ python scripts/real/download_study_datasets.py --repo-id YOUR_PRIVATE_DATASET_RE
 
 Recovery 专项与正式 ID/OOD 评测分开进行。Baseline 和 Improved 均已完成 10 次有效可控掉落测试，记录掉落后重抓尝试、重抓结果和最终入杯结果。两组模型在该专项测试中的结果一致，不据此声称 Improved 的恢复能力有所提升。
 
-生成专项测试计划：
+查看两组模型的 Recovery 专项协议：
 
 ```bash
 python scripts/real/study_protocol.py --phase recovery --condition baseline
 python scripts/real/study_protocol.py --phase recovery --condition improved
 ```
 
-运行 Recovery 专项评测时，使用 `scripts/real/evaluate_study.py --cell recovery`。该协议要求每个有效回合均确认发生可控掉落，并记录 `regrasp_attempted`、`regrasped`、`placed` 和 `success`；其中 `success` 必须表示重抓后最终入杯。
+专项评测入口为 `scripts/real/evaluate_study.py`。运行时分别指定 Baseline/Improved 的 Checkpoint、训练 Manifest 和独立输出文件；例如：
+
+```bash
+python scripts/real/evaluate_study.py \\
+  --condition baseline --seed 1000 --cell recovery \\
+  --checkpoint outputs/train/real_baseline_seed1000/checkpoints/010000/pretrained_model \\
+  --training-manifest outputs/train/real_baseline_seed1000/study_manifest.json \\
+  --output outputs/real/recovery_baseline.jsonl --dry-run
+
+python scripts/real/evaluate_study.py \\
+  --condition improved --seed 1000 --cell recovery \\
+  --checkpoint outputs/train/real_improved_seed1000/checkpoints/010000/pretrained_model \\
+  --training-manifest outputs/train/real_improved_seed1000/study_manifest.json \\
+  --output outputs/real/recovery_improved.jsonl --dry-run
+```
+
+该协议要求每个有效回合均确认发生可控掉落，并记录 `regrasp_attempted`、`regrasped`、`placed` 和 `success`；其中 `success` 必须表示重抓后最终入杯。
 
 对本地 Recovery JSONL 进行汇总：
 
