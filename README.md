@@ -124,7 +124,7 @@ https://github.com/user-attachments/assets/55915c62-7fe4-46f4-ad79-bfd149a8a380
 
 Recovery Failure 视频显示**掉落后没有完成重新定位和重抓**；另一段 Re-grasp 视频则展示了**掉落后重新接近并抓起方块**。我将两段视频按“掉落 → 重新观察 → 调整运动 → 重新接近 → 闭合夹爪 → 抬起 → 最终放置”分段对照。两段视频的直接差别在于：一段没有完成重抓，另一段完成了重抓；但仅凭视频尚不能确认失败是由于 Action Chunk 未及时更新、目标遮挡、夹爪执行问题，还是策略缺乏恢复行为。
 
-这种对照让我把改进目标明确为**掉落后能够重新接近、稳定夹起，并继续完成入杯**，而不只是让机械臂偶然出现一次重抓。为此，Recovery 组保留 30 条正常成功示教，并采集 20 条包含主动释放、重新抓取和完整放置的示教。评价时应将 **Re-grasp Success**（重新抓起）与 **Recovery Success**（重新抓起且完成放置）区分开；当前正式 ID/OOD 五场景还不足以单独证明恢复能力提升，需要可控掉落的专项测试作为补充。
+这种对照让我把改进目标明确为**掉落后能够重新接近、稳定夹起，并继续完成入杯**，而不只是让机械臂偶然出现一次重抓。为此，Recovery 组保留 30 条正常成功示教，并采集 20 条包含主动释放、重新抓取和完整放置的示教。评价时应将 **Re-grasp Success**（重新抓起）与 **Recovery Success**（重新抓起且完成放置）区分开；因此，我将 Recovery 作为独立专项进行验证；Baseline 与 Improved 均已完成 10 次有效可控掉落测试，两组结果一致，没有观察到 Improved 在该专项上的额外收益。
 
 **证据边界：** 上述排查顺序参考 SO-101 / LeRobot 工程实践，属于本项目的诊断方法与阶段性分析；仓库现有 `runtime.py` 自动记录推理耗时、控制步数和限幅步数，但尚未完整保存逐步预测动作、下发动作与关节反馈。因此，实际故障根因仍须由真实日志核验。失败阶段标签、诊断指标和 Recovery 专项的统计口径见[真机失败模式与恢复指标](docs/FAILURE_DIAGNOSTICS.md)。
 
@@ -141,7 +141,7 @@ Recovery Failure 视频显示**掉落后没有完成重新定位和重抓**；�
 | **Recovery** | 红色方块固定在标准位置；50 条示教中有 20 条包含主动释放、重新抓取并完成放置 | 增加掉落后的恢复动作与完整任务轨迹 |
 | **Color-varied** | 在标准位置采集红、橙、黄、蓝、紫五种颜色的方块示教，每种颜色 10 条；绿色仅用于评测 | 检查未见颜色下的外观泛化 |
 
-四组数据组成 Improved SmolVLA 的 200 条增强示教训练集；Baseline 使用原始示教数据。两组采用相同基础模型及 Full Fine-Tuning 配置。最终两模型对比检验的是**整体数据增强方案**，不能仅凭这组对照把收益完全归因于其中某一种示教策略。
+四组数据组成 Improved SmolVLA 的 200 条增强示教训练集；Baseline 使用 Clean 组 50 条示教。两组采用相同基础模型及 Full Fine-Tuning 配置。最终两模型对比检验的是**整体数据增强方案**，不能仅凭这组对照把收益完全归因于其中某一种示教策略。
 
 <a id="demo-results"></a>
 
@@ -402,7 +402,7 @@ python scripts/eval/eval_mujoco.py \
   --timeout-clock sim \
   --output outputs/eval/act_id_seed42.jsonl
 
-# OOD 候选范围示例：先验证训练分布不重叠及实际可达性再执行
+# OOD 实际实验范围：X=0.28–0.34 m，Y=0.04–0.16 m
 python scripts/eval/eval_mujoco.py \
   --policy smolvla \
   --checkpoint /path/to/smolvla/pretrained_model \
@@ -560,12 +560,12 @@ python scripts/real/record_study.py \
 
 #### 4.5.1 两个真机 SmolVLA 模型的训练对照
 
-正式对照仅包含 **Baseline SmolVLA** 和 **Improved SmolVLA**，共用同一个 `scripts/real/train_study.py` 训练入口。二者使用同一 SmolVLA 基础权重、Full Fine-Tuning（不配置 LoRA）、Seed 1000、10,000 steps、batch size 32 和每 2,000 steps 保存一次 Checkpoint；唯一计划变化的因素是训练数据。
+正式对照仅包含 **Baseline SmolVLA** 和 **Improved SmolVLA**，共用同一个 `scripts/real/train_study.py` 训练入口。二者使用同一 SmolVLA 基础权重、Full Fine-Tuning（不配置 LoRA）、Seed 1000、10,000 steps、batch size 32 和每 2,000 steps 保存一次 Checkpoint；唯一变化因素是训练数据。
 
 | 模型 | 数据组成 | 训练数据用途 |
 |---|---|---|
-| Baseline | 原始 Cube → Cup 示教数据（数量与来源以实际训练记录为准） | 基础对照 |
-| Improved | Clean / Randomized / Recovery / Color-varied 各 50 条，共 200 条 | 改进示教数据对照 |
+| Baseline | Clean 组 50 条 | 标准示教基线 |
+| Improved | Clean / Randomized / Recovery / Color-varied 各 50 条，共 200 条 | 多样化示教增强 |
 
 两组数据量和组成按本项目实际训练设置固定。Baseline 使用 Clean 组 50 条；Improved 在相同 Clean 数据基础上加入 Randomized、Recovery 和 Color-varied 各 50 条。该对照评估的是**整体示教数据增强方案**，不能仅凭两组结果把收益单独归因于某一种示教策略。
 
@@ -612,7 +612,7 @@ python scripts/real/train_study.py \
   --output outputs/train/real_improved_seed1000 --dry-run
 ```
 
-检查 `--dry-run` 输出后，去掉该参数或改为 `--execute` 即会真正启动训练。运行前需准备本地预训练权重和对应数据集。训练命令显式设置 `freeze_vision_encoder=false`、`train_expert_only=false`、`train_state_proj=true`，从而不沿用 LeRobot 0.5.1 默认的冻结视觉编码器与仅训练 Action Expert 选项。该配置不启用 LoRA。LeRobot 0.5.1 **默认预设**包括 AdamW、Learning Rate `1e-4`、Warmup `1000 steps`；这些数值需与本机 Base Model 的最终有效配置核对，不能直接当作已经执行过的训练日志。脚本会在训练后检查 Checkpoint 保存的冻结配置。
+检查 `--dry-run` 输出后，去掉该参数或改为 `--execute` 即会真正启动训练。运行前需准备本地预训练权重和对应数据集。训练命令显式设置 `freeze_vision_encoder=false`、`train_expert_only=false`、`train_state_proj=true`，从而不沿用 LeRobot 0.5.1 默认的冻结视觉编码器与仅训练 Action Expert 选项。该配置不启用 LoRA。训练实际使用的冻结配置由脚本显式设置，并在训练后从 Checkpoint 中检查；其他优化器和学习率等细节以本机训练日志与 Checkpoint 配置为准。
 
 两组模型训练均已完成。训练入口输出的 `study_manifest.json` 记录条件、种子、数据来源、模型 SHA-256、训练步数和相机特征映射，供评测阶段核对 Checkpoint 与训练配置。
 
