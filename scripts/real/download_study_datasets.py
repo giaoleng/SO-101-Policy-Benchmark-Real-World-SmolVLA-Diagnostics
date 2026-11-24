@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Download the four real-robot study subsets from the project's Hugging Face dataset.
+"""Download the four SO-101 demonstration subsets from a user-selected dataset repository.
 
-Source: https://huggingface.co/datasets/giaobo/so101-smovla
-The four condition folders are stored in one Dataset repository. Each subset is
-copied into data/real_demonstrations/<condition> for independent training.
+The repository ID is supplied at runtime so private dataset locations are not hard-coded
+into the public source tree. Downloaded data remain local and are never uploaded by this script.
 """
 from __future__ import annotations
 
@@ -13,7 +12,6 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-DATASET_REPO_ID = "giaobo/so101-smovla"
 DATASET_DIRS = {
     "clean": "cube-pickup-clean",
     "randomized": "cube-pickup-randomized",
@@ -55,8 +53,12 @@ def _card_license(info: Any) -> str | None:
     return getattr(card, "license", None)
 
 
-def main(argv=None) -> int:
+def build_parser():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--repo-id", required=True,
+                        help="Dataset repository ID; use a private repository for private demonstrations")
+    parser.add_argument("--revision", default="main",
+                        help="Dataset revision to resolve; the resolved commit SHA is recorded")
     parser.add_argument(
         "--condition",
         nargs="+",
@@ -79,12 +81,16 @@ def main(argv=None) -> int:
         action="store_true",
         help="List the subset download plan without downloading files.",
     )
-    args = parser.parse_args(argv)
+    return parser
 
+
+def main(argv=None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
     plan = [
         {
             "condition": condition,
-            "repo_id": DATASET_REPO_ID,
+            "repo_id": args.repo_id,
             "source_dir": DATASET_DIRS[condition],
             "target": str(args.output_root / condition),
         }
@@ -102,26 +108,28 @@ def main(argv=None) -> int:
             "python -m pip install -U huggingface_hub"
         ) from exc
 
-    api = HfApi()
+    api = HfApi(token=True)
     repo_info = api.dataset_info(
-        repo_id=DATASET_REPO_ID,
-        revision="main",
+        repo_id=args.repo_id,
+        revision=args.revision,
         files_metadata=True,
+        token=True,
     )
     revision = repo_info.sha
     if not revision:
-        raise RuntimeError(f"Could not resolve an immutable revision for {DATASET_REPO_ID}")
+        raise RuntimeError(f"Could not resolve an immutable revision for {args.repo_id}")
 
     staging = args.output_root / ".hub_snapshot"
     args.output_root.mkdir(parents=True, exist_ok=True)
     allow_patterns = [f"{DATASET_DIRS[c]}/**" for c in args.condition]
-    print(f"Resolving {DATASET_REPO_ID} at {revision} ...")
+    print(f"Resolving {args.repo_id} at {revision} ...")
     snapshot_download(
-        repo_id=DATASET_REPO_ID,
+        repo_id=args.repo_id,
         repo_type="dataset",
         revision=revision,
         local_dir=str(staging),
         allow_patterns=allow_patterns,
+        token=True,
     )
 
     siblings = getattr(repo_info, "siblings", None) or []
@@ -154,7 +162,7 @@ def main(argv=None) -> int:
             if getattr(sibling, "rfilename", "").startswith(prefix)
         )
         completed[condition] = {
-            "repo_id": DATASET_REPO_ID,
+            "repo_id": args.repo_id,
             "source_dir": item["source_dir"],
             "revision": revision,
             "local_path": str(target),
@@ -174,7 +182,7 @@ def main(argv=None) -> int:
     temporary_path = manifest_path.with_suffix(".json.tmp")
     temporary_path.write_text(
         json.dumps(
-            {"source_repo_id": DATASET_REPO_ID, "revision": revision, "conditions": completed},
+            {"source_repo_id": args.repo_id, "revision": revision, "conditions": completed},
             ensure_ascii=False,
             indent=2,
         )
