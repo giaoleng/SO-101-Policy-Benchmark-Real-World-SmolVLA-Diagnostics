@@ -25,10 +25,12 @@ SCORED_EPISODES = {
 }
 TOTAL_SCORED_EPISODES = sum(SCORED_EPISODES.values())
 WARMUP_EPISODES = 1
+RECOVERY_TESTS_PER_MODEL = 10
 POSITIONS = tuple(f'T{i}' for i in range(1, 11))
 HELD_OUT = tuple(f'E{i}' for i in range(1, 6))
 COLORS = ('red', 'orange', 'yellow', 'blue', 'purple')
 DEMOS_PER_CONDITION = 50
+BASELINE_DEMOS = 50
 TASK = 'Pick up the cube and place it in the cup.'
 
 
@@ -75,21 +77,47 @@ def evaluation_plan(cell: str) -> list[dict]:
     return result
 
 
+def recovery_plan(model_condition: str) -> list[dict]:
+    """Ten scored controlled-drop trials, kept separate from the 100-rollout ID/OOD study."""
+    if model_condition not in MODEL_CONDITIONS:
+        raise ValueError(f'Unknown model condition: {model_condition}')
+    return [
+        {
+            'eval_cell': 'recovery',
+            'model_condition': model_condition,
+            'episode': index + 1,
+            'warmup': False,
+            'scored_episode': index + 1,
+            'position_id': 'T6',
+            'cube_color': 'red',
+            'lighting': 'baseline',
+            'distractors': False,
+            'controlled_drop': True,
+            'operator_assistance': False,
+        }
+        for index in range(RECOVERY_TESTS_PER_MODEL)
+    ]
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--phase', required=True, choices=('collect', 'evaluate'))
-    parser.add_argument('--condition', choices=TRAIN_CONDITIONS)
+    parser.add_argument('--phase', required=True, choices=('collect', 'evaluate', 'recovery'))
+    parser.add_argument('--condition', choices=(*TRAIN_CONDITIONS, *MODEL_CONDITIONS))
     parser.add_argument('--cell', choices=EVAL_CELLS)
     parser.add_argument('--output', type=Path, help='Write JSON plan; refuses overwrite')
     args = parser.parse_args(argv)
     if args.phase == 'collect':
-        if not args.condition or args.cell:
-            parser.error('collect requires --condition and does not accept --cell')
+        if args.condition not in TRAIN_CONDITIONS or args.cell:
+            parser.error('collect requires a training --condition and does not accept --cell')
         plan = collection_plan(args.condition)
-    else:
+    elif args.phase == 'evaluate':
         if not args.cell or args.condition:
             parser.error('evaluate requires --cell and does not accept --condition')
         plan = evaluation_plan(args.cell)
+    else:
+        if args.condition not in MODEL_CONDITIONS or args.cell:
+            parser.error('recovery requires model --condition baseline|improved and does not accept --cell')
+        plan = recovery_plan(args.condition)
     payload = json.dumps(plan, ensure_ascii=False, indent=2)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
