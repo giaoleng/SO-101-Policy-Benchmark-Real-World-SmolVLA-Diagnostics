@@ -11,6 +11,7 @@ from scripts.real.evaluate_study import map_cameras_to_policy_features
 from scripts.real.study_protocol import (
     collection_plan, evaluation_plan, TRAIN_CONDITIONS, MODEL_CONDITIONS,
     EVAL_CELLS, TRAINING_SEEDS, SCORED_EPISODES, TOTAL_SCORED_EPISODES,
+    BASELINE_DEMOS, RECOVERY_TESTS_PER_MODEL, recovery_plan,
 )
 from scripts.real.train_study import training_command, check_dataset
 from scripts.real.record_study import record_command
@@ -43,6 +44,16 @@ class RealStudyProtocol(unittest.TestCase):
         self.assertEqual(positions, [f'E{i}' for _ in range(3) for i in range(1, 6)])
         self.assertEqual({r['cube_color'] for r in evaluation_plan('different_object')}, {'green'})
 
+    def test_recovery_protocol_has_ten_scored_trials_per_model(self):
+        self.assertEqual(RECOVERY_TESTS_PER_MODEL, 10)
+        for model in MODEL_CONDITIONS:
+            plan = recovery_plan(model)
+            self.assertEqual(len(plan), 10)
+            self.assertTrue(all(item['eval_cell'] == 'recovery' for item in plan))
+            self.assertTrue(all(item['warmup'] is False for item in plan))
+            self.assertTrue(all(item['controlled_drop'] is True for item in plan))
+            self.assertTrue(all(item['operator_assistance'] is False for item in plan))
+
     def test_matched_training_budget_and_dataset_contract(self):
         self.assertEqual(MODEL_CONDITIONS, ('baseline', 'improved'))
         for condition in MODEL_CONDITIONS:
@@ -67,9 +78,13 @@ class RealStudyProtocol(unittest.TestCase):
             base['total_episodes'] = 200
             (meta / 'info.json').write_text(json.dumps(base))
             self.assertEqual(check_dataset(Path(tmp), condition='improved')['total_episodes'], 200)
+            base['total_episodes'] = BASELINE_DEMOS
+            (meta / 'info.json').write_text(json.dumps(base))
+            self.assertEqual(check_dataset(Path(tmp), condition='baseline')['total_episodes'], BASELINE_DEMOS)
             base['total_episodes'] = 12
             (meta / 'info.json').write_text(json.dumps(base))
-            self.assertEqual(check_dataset(Path(tmp), condition='baseline')['total_episodes'], 12)
+            with self.assertRaises(ValueError):
+                check_dataset(Path(tmp), condition='baseline')
             with self.assertRaises(ValueError):
                 check_dataset(Path(tmp), condition='improved')
             base['total_episodes'] = 0
