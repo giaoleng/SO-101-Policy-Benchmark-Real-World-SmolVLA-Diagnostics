@@ -728,7 +728,7 @@ python scripts/real/download_study_datasets.py \\
   --condition clean randomized recovery color
 ```
 
-脚本会解析并记录固定 commit SHA，校验每组 50 条示教、30 FPS、六维 action/state 和 overhead/wrist 双相机特征，然后保存到本地 `data/real_demonstrations/`。该脚本只下载，不会将本地数据上传到 Hub。采集和训练入口也分别关闭 `dataset.push_to_hub` 与 `policy.push_to_hub`。
+脚本会解析并记录固定 commit SHA，校验每组 50 条示教、30 FPS、六维 action/state 和 overhead/wrist 双相机特征，然后保存到本地 `data/real_demonstrations/`。该脚本只下载，不会将本地数据上传到 Hub。采集和训练入口也分别关闭 `dataset.push_to_hub` 与 `policy.push_to_hub`。 如需通过 Hub 管理项目产物，`scripts/hf/upload_hf.py` 仅允许上传到私有仓库，会拒绝公开仓库目标。
 
 <a id="reproducibility"></a>
 
