@@ -73,4 +73,6 @@ python scripts/real/summarize_study.py outputs/real/eval_*.jsonl \
 
 ## 结果口径
 
-README 首页保留此前的模型摘要成绩，但不能将其认定为两模型新协议下 40 ID / 60 OOD 的精确统计结果。已有四组独立训练和评测也不等价于 Improved 使用 200 条合并数据的训练；实际获得相应 Checkpoint 与评测日志后，才能形成新方案的正式对照结果。
+README 首页展示按历史摘要就近换算的整数计数示例（明确标为非实测），不是两模型新协议下的正式成绩。已有四组独立训练和评测也不等价于 Improved 使用 200 条合并数据的训练；实际获得相应 Checkpoint 与评测日志后，才能形成新方案的正式对照结果。
+
+补充协议：每类 OOD 独立报告 15 次有效回合的成功次数；Recovery 专项计划每模型 10 次有效掉落，不计入正式 ID/OOD。异常回合按 [README 评测规则](../README.md#real-evaluation) 审核：有效策略失败必须计分，只有经核验的外部故障或布场错误允许补测；不删除原记录。统计演示见 [DIAGNOSTIC_EXAMPLE.md](DIAGNOSTIC_EXAMPLE.md)。
