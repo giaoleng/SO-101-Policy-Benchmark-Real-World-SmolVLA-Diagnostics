@@ -266,7 +266,7 @@ python3.12 -m venv .venv && source .venv/bin/activate
 python -m pip install --upgrade pip
 
 # 以 CPU 版 PyTorch 为例（GPU 训练请安装对应 CUDA 版本）
-python -m pip install torch==2.7.0 torchvision==0.22.0 \\
+python -m pip install torch==2.7.0 torchvision==0.22.0 \
   --index-url https://download.pytorch.org/whl/cpu
 python -m pip install "lerobot==0.5.1" "mujoco==3.1.6" \
   numpy Pillow glfw termcolor PyYAML mink matplotlib scipy opencv-python
@@ -723,8 +723,8 @@ Baseline 与 Improved 的五类正式 ID/OOD 场景评测均已完成。每个�
 
 ```bash
 hf auth login
-python scripts/real/download_study_datasets.py \\
-  --repo-id YOUR_PRIVATE_DATASET_REPO \\
+python scripts/real/download_study_datasets.py \
+  --repo-id YOUR_PRIVATE_DATASET_REPO \
   --condition clean randomized recovery color
 ```
 
