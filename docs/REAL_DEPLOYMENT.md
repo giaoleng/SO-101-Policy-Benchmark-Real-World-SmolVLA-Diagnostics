@@ -62,16 +62,16 @@ python scripts/real/study_protocol.py --phase recovery --condition improved
 专项评测入口为 `scripts/real/evaluate_study.py`。运行时分别指定 Baseline/Improved 的 Checkpoint、训练 Manifest 和独立输出文件；例如：
 
 ```bash
-python scripts/real/evaluate_study.py \\
-  --condition baseline --seed 1000 --cell recovery \\
-  --checkpoint outputs/train/real_baseline_seed1000/checkpoints/010000/pretrained_model \\
-  --training-manifest outputs/train/real_baseline_seed1000/study_manifest.json \\
+python scripts/real/evaluate_study.py \
+  --condition baseline --seed 1000 --cell recovery \
+  --checkpoint outputs/train/real_baseline_seed1000/checkpoints/010000/pretrained_model \
+  --training-manifest outputs/train/real_baseline_seed1000/study_manifest.json \
   --output outputs/real/recovery_baseline.jsonl --dry-run
 
-python scripts/real/evaluate_study.py \\
-  --condition improved --seed 1000 --cell recovery \\
-  --checkpoint outputs/train/real_improved_seed1000/checkpoints/010000/pretrained_model \\
-  --training-manifest outputs/train/real_improved_seed1000/study_manifest.json \\
+python scripts/real/evaluate_study.py \
+  --condition improved --seed 1000 --cell recovery \
+  --checkpoint outputs/train/real_improved_seed1000/checkpoints/010000/pretrained_model \
+  --training-manifest outputs/train/real_improved_seed1000/study_manifest.json \
   --output outputs/real/recovery_improved.jsonl --dry-run
 ```
 
