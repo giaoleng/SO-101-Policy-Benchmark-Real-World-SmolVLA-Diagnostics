@@ -125,11 +125,11 @@ def main(argv=None):
             label = ('warmup (not scored)' if item['warmup']
                      else f"scored {item['scored_episode']}/{expected_scored}")
             if is_recovery:
-                prompt = (f"[{args.condition}/seed{args.seed} recovery] trial {item['episode']}/10\\n"
+                prompt = (f"[{args.condition}/seed{args.seed} recovery] trial {item['episode']}/10\n"
                           "按既定可控掉落流程准备场景，确认目标可见、可达且机械臂处于安全起始姿态；"
                           "执行后不进行人工接管。按 Enter 运行： ")
             else:
-                prompt = (f"[{args.condition}/seed{args.seed} {args.cell}] episode {item['episode']} {label}\\n"
+                prompt = (f"[{args.condition}/seed{args.seed} {args.cell}] episode {item['episode']} {label}\n"
                           f"Position={item['position_id']}, color={item['cube_color']}, lighting={item['lighting']}, "
                           f"distractors={item['distractors']}. Confirm physical scene + safe home; Enter to run: ")
             input(prompt)
