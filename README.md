@@ -113,10 +113,10 @@ https://github.com/user-attachments/assets/55915c62-7fe4-46f4-ad79-bfd149a8a380
 
 | 固定示教策略 | 数据组成 | 主要考察的问题 |
 |---|---|---|
-| **Clean** | 红色方块固定 T6；50 条正常成功示教 | 基础操作能力与固定位置基线 |
-| **Randomized** | 红色方块在 T1–T10 各采集 5 条 | 目标位置变化时的接近与位置泛化，对应 Reach Failure |
-| **Recovery** | 红色方块固定 T6；其中 20 条包含主动释放、重抓并完成入杯 | 掉落后的重新定位与抓取，对应 Recovery Failure |
-| **Color-varied** | 固定 T6；红、橙、黄、蓝、紫各 10 条；绿色留作评测 | 物体外观变化下的策略表现 |
+| **Clean** | 红色方块固定在标准位置，采集 50 条正常成功示教 | 基础抓取放置能力 |
+| **Randomized** | 红色方块在 10 个不同位置采集示教，每个位置 5 条 | 目标位置变化时的抓取能力与空间泛化，对应 Reach Failure |
+| **Recovery** | 红色方块固定在标准位置；50 条示教中有 20 条包含主动释放、重新抓取并完成放置 | 掉落后的重新定位与抓取，对应 Recovery Failure |
+| **Color-varied** | 在标准位置采集红、橙、黄、蓝、紫五种颜色的方块示教，每种颜色 10 条；绿色仅用于评测 | 不同物体外观下的操作能力 |
 
 这四组数据用于组成 Improved SmolVLA 的增强示教训练集；Baseline 使用原始示教数据。No Motion 仍需要先排查硬件、通信和控制链路，不能仅凭增加示教数据就认定能够解决。
 
@@ -475,7 +475,7 @@ python scripts/real/download_study_datasets.py --condition clean recovery
 python -m pip install -U huggingface_hub
 ```
 
-**ID / OOD 划分：** 训练使用四组示教数据，绿色 Cube 在训练集完全不出现。真机正式评测每组模型 ID 40 次（T6、红色方块、标准光照），OOD 共 60 次：新位置、低光照、绿色方块及干扰物四项各 15 次。ID:OOD = **40:60** 是评测比例，不是训练集中的 ID:OOD 采样比例。
+**ID / OOD 划分：** 训练使用四组示教数据，绿色 Cube 在训练集完全不出现。真机正式评测每组模型 ID 40 次（红色方块置于标准位置、标准光照），OOD 共 60 次：新位置、低光照、绿色方块及干扰物四项各 15 次。ID:OOD = **40:60** 是评测比例，不是训练集中的 ID:OOD 采样比例。
 
 训练时将数据集的 `observation.images.overhead`、`observation.images.wrist` 映射到策略输入的 `camera1`、`camera2`；真机推理时使用 front / wrist 两路相机。相机名称、分辨率、FPS 和特征映射必须与训练配置一致。
 
@@ -486,7 +486,7 @@ python -m pip install -U huggingface_hub
 - **真机任务**：SO-101 抓取桌面方块并放入固定杯子；统一指令 <code>Pick up the cube and place it in the cup.</code>。
 - **固定条件**：同一机器人、相机与安装角度、固定复位位姿、杯子位置、训练初始权重、训练步数及评分标准。
 - **双路相机**：前/全局与腕部相机（目标配置 640×480、30 FPS）。必须核对实际设备名称与训练权重的 <code>rename_map</code>，按本机相机索引配置。
-- **空间标记**：在本机安全工作区标记 T1–T10（训练位置）及 E1–E5（从未示教的评测位置）；T6 为固定基准位置。编号只代表实验位置，桌面坐标需按实际机器人重新标定。
+- **空间设置**：在机械臂安全可达工作区内设置标准位置和多个训练位置，并选取训练数据未覆盖的新位置用于 OOD 评测；实际摆放位置需按本机工作空间确定。
 - **安全**：检查标定、关节限位、停止入口、实体急停、障碍物和夹爪极性；现有 <code>configs/real/so101.yaml</code> 默认 <code>robot.hardware_confirmed: false</code>，不会自动启用真机。
 
 <a id="real-collection"></a>
@@ -580,11 +580,11 @@ Baseline 与 Improved 使用相同的真机环境、相机与复位方式，每�
 
 | 场景 | 每模型正式次数 | 测试内容 |
 |---|---:|---|
-| ID (`in_distribution`) | 40 | 红色 Cube，T6，标准光照 |
-| OOD: New positions | 15 | E1–E5 未示教位置 |
-| OOD: Reduced lighting | 15 | T6，低光照 |
+| ID (`in_distribution`) | 40 | 红色 Cube 置于标准位置，标准光照 |
+| OOD: New positions | 15 | 方块放置在训练数据未覆盖的新位置，测试空间泛化能力 |
+| OOD: Reduced lighting | 15 | 方块置于标准位置，低光照 |
 | OOD: Different object | 15 | **绿色 Cube**，仅用于 OOD |
-| OOD: Distractors | 15 | T6，存在干扰物 |
+| OOD: Distractors | 15 | 方块置于标准位置，存在干扰物 |
 
 推理通过 `RealPolicyRunner` 调用 `policy.select_action(...)`；当前控制参数来自 `configs/real/so101.yaml`：**20 Hz 控制频率、45 秒单回合上限、最多 900 步、推理超时 1 秒**。相机采集为 640×480、30 FPS。LeRobot 0.5.1 的 SmolVLA **默认预设**为 Flow Sampling `num_steps=10`、Action Chunk `chunk_size=50`、`n_action_steps=50`，采样循环采用固定时间步的数值积分；实际生效数值仍由加载的 Checkpoint 配置决定。本项目的评测入口没有额外覆盖这些参数。
 
