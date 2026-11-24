@@ -16,18 +16,22 @@ from scripts.real.task_conditioning import TaskConditioner
 from scripts.eval.act_rollout import JsonlRecorder
 
 
-def read_outcome(input_fn=input):
-    """操作者标注闭环结果与失败阶段；不将动作发出或超时当作成功。"""
+def read_outcome(input_fn=input, *, require_recovery=False):
+    """操作者标注闭环结果；Recovery 模式强制记录完整掉落、重抓与入杯链路。"""
     flags = {
         'success', 'correct_target', 'started', 'reached', 'grasped', 'placed',
         'released', 'dropped', 'regrasp_attempted', 'regrasped',
     }
     failure_modes = {'none', 'reach', 'no_motion', 'recovery', 'grasp', 'placement', 'timeout', 'other'}
     while True:
-        raw = input_fn(
+        prompt = (
+            'Recovery 专项请完整标注 dropped/regrasp_attempted/regrasped/placed/success；'
+            'success 必须表示重抓后最终入杯。输入结果 JSON： '
+            if require_recovery else
             '输入结果JSON，如 {"success":false,"started":true,"reached":false,'
             '"failure_mode":"reach"}（可记录dropped/regrasped等阶段）： '
         )
+        raw = input_fn(prompt)
         try:
             result = json.loads(raw)
             if not isinstance(result, dict) or set(result) - (flags | {'failure_mode'}):
@@ -49,6 +53,17 @@ def read_outcome(input_fn=input):
                     raise ValueError('旧格式success应与correct_target/grasped/placed一致')
             if result.get('regrasped') is True and result.get('dropped') is False:
                 raise ValueError('没有发生掉落的回合不应标记regrasped=true')
+            if result.get('regrasped') is True and result.get('regrasp_attempted') is False:
+                raise ValueError('regrasped=true时regrasp_attempted不能为false')
+            if require_recovery:
+                required = ('dropped', 'regrasp_attempted', 'regrasped', 'placed', 'success')
+                missing = [key for key in required if type(result.get(key)) is not bool]
+                if missing:
+                    raise ValueError(f'Recovery 专项缺少布尔标注：{missing}')
+                if result['dropped'] is not True:
+                    raise ValueError('Recovery 专项每个有效回合都必须确认发生可控掉落')
+                if result['success'] != (result['regrasped'] and result['placed']):
+                    raise ValueError('Recovery success 必须等于 regrasped 且 placed')
             if result['success'] and result.get('failure_mode') not in (None, 'none'):
                 raise ValueError('success=true时failure_mode只能是none或省略')
             return result
