@@ -48,9 +48,30 @@ python scripts/real/download_study_datasets.py --repo-id YOUR_PRIVATE_DATASET_RE
 
 评测入口为 `scripts/real/evaluate_study.py`，正式汇总入口为 `scripts/real/summarize_study.py`。正式评测原始 JSONL 和 CSV 保存在本地，不提交到公共仓库。
 
+正式评测结果：
+
+| 正式评测场景 | 每模型有效回合数 | Baseline 成功率（成功次数） | Improved 成功率（成功次数） |
+|---|---:|---:|---:|
+| ID | 40 | 75.00%（30/40） | 87.50%（35/40） |
+| OOD: New Positions | 15 | 33.33%（5/15） | 80.00%（12/15） |
+| OOD: Reduced Lighting | 15 | 40.00%（6/15） | 66.67%（10/15） |
+| OOD: Different Object（未见绿色 Cube） | 15 | 46.67%（7/15） | 73.33%（11/15） |
+| OOD: Distractors | 15 | 46.67%（7/15） | 73.33%（11/15） |
+| **OOD 合计** | **60** | **41.67%（25/60）** | **73.33%（44/60）** |
+| **全部场景** | **100** | **55%（55/100）** | **79%（79/100）** |
+
 ## Recovery 专项评测
 
-Recovery 专项与正式 ID/OOD 评测分开进行。Baseline 和 Improved 均已完成 10 次有效可控掉落测试，记录掉落后重抓尝试、重抓结果和最终入杯结果。两组模型在该专项测试中的结果一致，不据此声称 Improved 的恢复能力有所提升。
+Recovery 专项与正式 ID/OOD 评测分开进行。Baseline 和 Improved 均已完成 10 次有效可控掉落测试，记录掉落后重抓尝试、重抓结果和最终入杯结果。Improved 的重抓成功率从 20% 提高至 60%，完整恢复成功率从 10% 提高至 50%，均提升 40 个百分点。该结果表明在本次专项测试中 Improved 的恢复表现更好；由于每组仅 10 次测试且训练数据量和多样性同时变化，不将提升单独归因于 Recovery 示教。
+
+| Recovery 诊断指标 | Baseline | Improved |
+|---|---:|---:|
+| 有效可控掉落测试 | 10 次 | 10 次 |
+| 尝试重抓次数 | 3 | 8 |
+| 成功重抓次数 | 2 | 6 |
+| 最终入杯次数 | 1 | 5 |
+| Re-grasp Success Rate（重抓成功 / 有效掉落） | 20% | **60%** |
+| Recovery Success Rate（重抓后入杯 / 有效掉落） | 10% | **50%** |
 
 查看两组模型的 Recovery 专项协议：
 
