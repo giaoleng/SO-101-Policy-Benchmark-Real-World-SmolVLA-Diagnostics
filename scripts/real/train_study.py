@@ -24,6 +24,28 @@ from scripts.real.study_protocol import (
 )
 
 
+DEFAULT_RENAME_MAP = {
+    'observation.images.front': 'observation.images.camera1',
+    'observation.images.wrist': 'observation.images.camera2',
+}
+
+
+def default_rename_map(features=None):
+    """Use front/wrist for new datasets; retain legacy overhead checkpoints/data."""
+    rename = dict(DEFAULT_RENAME_MAP)
+    if features is None:
+        return rename
+    front, legacy = 'observation.images.front', 'observation.images.overhead'
+    if front in features and legacy in features:
+        raise ValueError('Both front and overhead exist; specify --rename-map explicitly')
+    if front not in features and legacy in features:
+        rename[legacy] = rename.pop(front)
+    missing = set(rename) - set(features)
+    if missing:
+        raise ValueError(f'Missing camera features: {sorted(missing)}')
+    return rename
+
+
 def training_command(*, condition: str, seed: int, repo_id: str, dataset_root: Path,
                      base_model: Path, output: Path, device='cuda', rename_map=None) -> list[str]:
     if condition not in MODEL_CONDITIONS or seed not in TRAINING_SEEDS:
@@ -73,16 +95,25 @@ def main(argv=None):
     parser.add_argument('--base-model', required=True, type=Path, help='Local SmolVLA base checkpoint')
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--device', default='cuda')
-    parser.add_argument('--rename-map', default='{"observation.images.overhead":"observation.images.camera1","observation.images.wrist":"observation.images.camera2"}',
-                        help='JSON mapping of dataset feature names to model keys; empty JSON disables')
+    parser.add_argument('--rename-map', default=None,
+                        help='JSON mapping; defaults to front/wrist -> camera1/camera2; legacy overhead is detected from metadata; empty JSON disables')
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--execute', dest='execute', action='store_true', help='Train the policy (default)')
     mode.add_argument('--dry-run', dest='execute', action='store_false', help='Print training command only')
     parser.set_defaults(execute=True)
     args = parser.parse_args(argv)
-    rename = json.loads(args.rename_map)
-    if not isinstance(rename, dict) or any(not isinstance(k, str) or not isinstance(v, str) for k, v in rename.items()):
-        parser.error('--rename-map must be a JSON object with string keys/values')
+    try:
+        if args.rename_map is None:
+            info_path = args.dataset_root / 'meta' / 'info.json'
+            features = (json.loads(info_path.read_text(encoding='utf-8'))['features']
+                        if info_path.is_file() else None)
+            rename = default_rename_map(features)
+        else:
+            rename = json.loads(args.rename_map)
+        if not isinstance(rename, dict) or any(not isinstance(k, str) or not isinstance(v, str) for k, v in rename.items()):
+            raise ValueError('--rename-map must be a JSON object with string keys/values')
+    except (ValueError, KeyError, TypeError, OSError) as exc:
+        parser.error(str(exc))
     cmd = training_command(condition=args.condition, seed=args.seed, repo_id=args.repo_id,
                            dataset_root=args.dataset_root, base_model=args.base_model,
                            output=args.output, device=args.device, rename_map=rename)
