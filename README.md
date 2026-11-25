@@ -124,7 +124,7 @@ https://github.com/user-attachments/assets/55915c62-7fe4-46f4-ad79-bfd149a8a380
 
 Recovery Failure 视频显示**掉落后没有完成重新定位和重抓**；另一段 Re-grasp 视频则展示了**掉落后重新接近并抓起方块**。我将两段视频按“掉落 → 重新观察 → 调整运动 → 重新接近 → 闭合夹爪 → 抬起 → 最终放置”分段对照。两段视频的直接差别在于：一段没有完成重抓，另一段完成了重抓；但仅凭视频尚不能确认失败是由于 Action Chunk 未及时更新、目标遮挡、夹爪执行问题，还是策略缺乏恢复行为。
 
-这种对照让我把改进目标明确为**掉落后能够重新接近、稳定夹起，并继续完成入杯**，而不只是让机械臂偶然出现一次重抓。为此，Recovery 组保留 30 条正常成功示教，并采集 20 条包含主动释放、重新抓取和完整放置的示教。评价时应将 **Re-grasp Success**（重新抓起）与 **Recovery Success**（重新抓起且完成放置）区分开；因此，我将 Recovery 作为独立专项进行验证；Baseline 与 Improved 均已完成 10 次有效可控掉落测试，两组结果一致，没有观察到 Improved 在该专项上的额外收益。
+这种对照让我把改进目标明确为**掉落后能够重新接近、稳定夹起，并继续完成入杯**，而不只是让机械臂偶然出现一次重抓。为此，Recovery 组保留 30 条正常成功示教，并采集 20 条包含主动释放、重新抓取和完整放置的示教。评价时应将 **Re-grasp Success**（重新抓起）与 **Recovery Success**（重新抓起且完成放置）区分开；因此，我将 Recovery 作为独立专项进行验证；Baseline 与 Improved 均已完成 10 次有效可控掉落测试，Improved 的重抓成功率由 20% 提升至 60%，完整恢复成功率由 10% 提升至 50%。
 
 **证据边界：** 上述排查顺序参考 SO-101 / LeRobot 工程实践，属于本项目的诊断方法与阶段性分析；仓库现有 `runtime.py` 自动记录推理耗时、控制步数和限幅步数，但尚未完整保存逐步预测动作、下发动作与关节反馈。因此，实际故障根因仍须由真实日志核验。失败阶段标签、诊断指标和 Recovery 专项的统计口径见[真机失败模式与恢复指标](docs/FAILURE_DIAGNOSTICS.md)。
 
@@ -150,9 +150,9 @@ Recovery Failure 视频显示**掉落后没有完成重新定位和重抓**；�
 | 实验 | 模型 / 数据条件 | 结果 |
 |---|---|---|
 | MuJoCo 仿真 | SmolVLA | **95% ID / 83% OOD** |
-| SO-101 真机 | Baseline SmolVLA | Clean 50 条示教 Full Fine-Tuning 已完成；ID/OOD 正式评测已完成 |
-| SO-101 真机 | Improved SmolVLA | 四组各 50 条、合计 200 条示教 Full Fine-Tuning 已完成；ID/OOD 正式评测已完成 |
-| SO-101 Recovery 专项 | Baseline / Improved | 每模型 10 次有效可控掉落测试已完成；两模型结果一致 |
+| SO-101 真机 | Baseline SmolVLA（Clean 50 条） | 75.00% ID（30/40） / 41.67% OOD（25/60） |
+| SO-101 真机 | Improved SmolVLA（四组共 200 条） | **87.50% ID（35/40） / 73.33% OOD（44/60）** |
+| SO-101 Recovery 专项 | Baseline → Improved | 重抓成功率 20% → 60%；完整恢复成功率 10% → 50% |
 
 真机示教数据、模型 Checkpoint 和逐回合评测日志保存在本地或私有存储，不包含在公共源码仓库中。
 
@@ -683,12 +683,16 @@ python scripts/real/summarize_study.py outputs/real/eval_*.jsonl \
 
 Baseline 与 Improved 均已完成 10 次有效可控掉落测试。测试记录掉落后是否尝试重抓、是否成功重抓，以及是否最终完成入杯；掉落后不提供人工接管。Recovery 专项不并入每模型 100 次正式 ID/OOD 评测。
 
-| Recovery 专项 | Baseline | Improved |
+| Recovery 诊断指标 | Baseline | Improved |
 |---|---:|---:|
 | 有效可控掉落测试 | 10 次 | 10 次 |
-| 测试结果对比 | 与 Improved 一致 | 与 Baseline 一致 |
+| 尝试重抓次数 | 3 | 8 |
+| 成功重抓次数 | 2 | 6 |
+| 最终入杯次数 | 1 | 5 |
+| Re-grasp Success Rate（重抓成功 / 有效掉落） | 20% | **60%** |
+| Recovery Success Rate（重抓后入杯 / 有效掉落） | 10% | **50%** |
 
-本项目两组模型在该 Recovery 专项测试中的结果一致，因此不将该专项结果表述为 Improved 的恢复能力提升。Recovery 指标定义及本地汇总命令见[真机失败模式与恢复指标](docs/FAILURE_DIAGNOSTICS.md)。
+Improved 的重抓成功率从 20% 提高至 60%，完整恢复成功率从 10% 提高至 50%，均提升 40 个百分点。该结果表明在本次专项测试中 Improved 的恢复表现更好；由于每组仅 10 次测试且训练数据量和多样性同时变化，不将提升单独归因于 Recovery 示教。Recovery 指标定义及本地汇总命令见[真机失败模式与恢复指标](docs/FAILURE_DIAGNOSTICS.md)。
 
 
 <a id="real-results"></a>
@@ -697,15 +701,17 @@ Baseline 与 Improved 均已完成 10 次有效可控掉落测试。测试记录
 
 Baseline 与 Improved 的五类正式 ID/OOD 场景评测均已完成。每个模型包含 40 次 ID 和四类 OOD 各 15 次，共 100 次有效计分回合；两模型采用相同评测协议。
 
-| 正式评测场景 | 每模型有效回合数 | Baseline | Improved |
-|---|---:|---|---|
-| ID | 40 | 已完成 | 已完成 |
-| OOD: New Positions | 15 | 已完成 | 已完成 |
-| OOD: Reduced Lighting | 15 | 已完成 | 已完成 |
-| OOD: Different Object（未见绿色 Cube） | 15 | 已完成 | 已完成 |
-| OOD: Distractors | 15 | 已完成 | 已完成 |
-| **OOD 合计** | **60** | **已完成** | **已完成** |
-| **全部场景** | **100** | **已完成** | **已完成** |
+| 正式评测场景 | 每模型有效回合数 | Baseline 成功率（成功次数） | Improved 成功率（成功次数） |
+|---|---:|---:|---:|
+| ID | 40 | 75.00%（30/40） | 87.50%（35/40） |
+| OOD: New Positions | 15 | 33.33%（5/15） | 80.00%（12/15） |
+| OOD: Reduced Lighting | 15 | 40.00%（6/15） | 66.67%（10/15） |
+| OOD: Different Object（未见绿色 Cube） | 15 | 46.67%（7/15） | 73.33%（11/15） |
+| OOD: Distractors | 15 | 46.67%（7/15） | 73.33%（11/15） |
+| **OOD 合计** | **60** | **41.67%（25/60）** | **73.33%（44/60）** |
+| **全部场景** | **100** | **55%（55/100）** | **79%（79/100）** |
+
+Improved 的 ID 成功率提高 12.50 个百分点，OOD 成功率提高 31.67 个百分点（19/60），整体成功率提高 24 个百分点。新位置场景增加 7 次成功（46.67 个百分点），是四类 OOD 中提升最大的场景。该对照支持整体示教数据增强方案的效果，但不单独识别各组数据的贡献。
 
 每类 OOD 成功率以 15 次为分母，OOD 合计成功率以 60 次为分母。逐回合原始日志与数值汇总保存在本地评测目录，不随公共源码仓库发布；可使用 `scripts/real/summarize_study.py` 从本地 JSONL 生成 CSV。
 
