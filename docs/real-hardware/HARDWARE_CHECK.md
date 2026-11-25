@@ -21,7 +21,7 @@
 ## C. 相机与视觉
 
 - [ ] 用 <code>lerobot-find-cameras</code> 确认 front / wrist 设备身份。
-- [ ] Front / overhead 视野覆盖整个任务区域；wrist 视野能看到夹爪和接触区域。
+- [ ] Front 视野覆盖整个任务区域；wrist 视野能看到夹爪和接触区域。
 - [ ] 相机支架稳固，机械臂全范围运动时不会遮挡、碰撞或拉扯相机线。
 - [ ] 采集、训练和部署的图像尺寸、FPS、RGB 通道与 feature rename map 一致。
 - [ ] 光照、曝光和白平衡不会在不同实验组之间无记录地改变。
