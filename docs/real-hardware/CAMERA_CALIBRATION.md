@@ -18,7 +18,7 @@ lerobot-find-cameras
 
 ## 2. 固定安装位置和采集条件
 
-- Front / overhead 相机：固定在工作区外部，完整覆盖方块、杯子、机械臂抓取区域和放置区域。
+- Front 相机：固定在工作区外部，完整覆盖方块、杯子、机械臂抓取区域和放置区域。
 - Wrist 相机：固定在腕部刚性支架上，抓取时能看到夹爪、目标方块和接触区域；运动时线缆不能拉扯或进入关节夹缝。
 - 固定支架、俯仰角、焦距/焦点和相机朝向；每组训练数据和正式评测期间不要随意移动。
 - 核对曝光、白平衡、对焦和照明是否会自动大幅变化。条件允许时锁定自动曝光/白平衡，避免同一场景的图像分布漂移。
@@ -30,7 +30,7 @@ lerobot-find-cameras
 
 本项目参考数据集使用：
 
-- <code>observation.images.overhead</code>
+- <code>observation.images.front</code>（历史数据中的 <code>observation.images.overhead</code> 兼容映射至同一模型输入）
 - <code>observation.images.wrist</code>
 
 本项目本机采集配置使用 front / wrist 时，必须在训练和评测配置中显式映射并保持一致。检查以下内容：
