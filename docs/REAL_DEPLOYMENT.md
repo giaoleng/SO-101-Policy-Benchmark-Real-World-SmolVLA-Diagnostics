@@ -21,7 +21,7 @@ hf auth login
 python scripts/real/download_study_datasets.py --repo-id YOUR_PRIVATE_DATASET_REPO --condition clean randomized recovery color
 ```
 
-下载脚本在运行时接收仓库 ID，记录解析后的 commit SHA，并校验每组 50 条、30 FPS、六维 action/state 和双相机特征；不会上传数据。
+下载脚本在运行时接收仓库 ID，记录解析后的 commit SHA，并校验每组 50 条、30 FPS、六维 action/state 和 front/wrist 双相机特征；不会上传数据。新采集数据统一使用 `observation.images.front` 和 `observation.images.wrist`，默认分别映射至 SmolVLA 的 `observation.images.camera1` 和 `observation.images.camera2`。历史数据中的 `observation.images.overhead` 由训练入口根据元数据自动识别，旧 Checkpoint 的映射仍然有效；合并时四组源数据仍须采用一致的实际特征 Schema。
 
 ## Full Fine-Tuning
 
