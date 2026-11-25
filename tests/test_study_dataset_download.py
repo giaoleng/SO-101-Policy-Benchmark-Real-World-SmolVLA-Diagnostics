@@ -34,12 +34,19 @@ class StudyDatasetDownloadTests(unittest.TestCase):
             "features": {
                 "action": {"shape": [6]},
                 "observation.state": {"shape": [6]},
-                "observation.images.overhead": {"shape": [480, 640, 3]},
+                "observation.images.front": {"shape": [480, 640, 3]},
                 "observation.images.wrist": {"shape": [480, 640, 3]},
             },
         }
         validate_dataset_metadata(metadata)
         self.assertEqual(len(REQUIRED_FEATURES), 4)
+        self.assertIn('observation.images.front', REQUIRED_FEATURES)
+        features = metadata['features']
+        features['observation.images.overhead'] = features.pop('observation.images.front')
+        validate_dataset_metadata(metadata)  # older data remain readable
+        features.pop('observation.images.overhead')
+        with self.assertRaises(ValueError):
+            validate_dataset_metadata(metadata)
 
     def test_wrong_episode_count_is_rejected(self):
         metadata = {
@@ -48,7 +55,7 @@ class StudyDatasetDownloadTests(unittest.TestCase):
             "features": {
                 "action": {"shape": [6]},
                 "observation.state": {"shape": [6]},
-                "observation.images.overhead": {"shape": [480, 640, 3]},
+                "observation.images.front": {"shape": [480, 640, 3]},
                 "observation.images.wrist": {"shape": [480, 640, 3]},
             },
         }
