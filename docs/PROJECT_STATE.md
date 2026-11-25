@@ -28,8 +28,29 @@ Baseline 与 Improved 两组 SmolVLA 均已完成 Full Fine-Tuning、正式 ID/O
 - **Improved**：合并 Clean、Randomized、Recovery、Color-varied 四组，每组 50 条，共 200 条示教。
 - **训练配置**：同一 SmolVLA 基础权重、Full Fine-Tuning、不使用 LoRA、Seed 1000、10,000 steps、Batch Size 32。
 - **正式评测**：每个模型 40 次 ID + 4 类 OOD 各 15 次，共 100 次有效计分回合；两模型均已完成。
-- **Recovery 专项**：Baseline 与 Improved 各完成 10 次有效可控掉落测试；两组测试结果一致。该专项独立于正式 ID/OOD 评测。
+- **Recovery 专项**：Baseline 与 Improved 各完成 10 次有效可控掉落测试；重抓成功率分别为 20%（2/10）和 60%（6/10），完整恢复成功率分别为 10%（1/10）和 50%（5/10）。该专项独立于正式 ID/OOD 评测。
 - **数据与产物**：训练示教、模型 Checkpoint、逐回合 JSONL 和统计 CSV 保存在本地或私有存储，不随公共源码仓库发布。
+
+## 真机实验结果
+
+| 正式评测场景 | 每模型有效回合数 | Baseline 成功率（成功次数） | Improved 成功率（成功次数） |
+|---|---:|---:|---:|
+| ID | 40 | 75.00%（30/40） | 87.50%（35/40） |
+| OOD: New Positions | 15 | 33.33%（5/15） | 80.00%（12/15） |
+| OOD: Reduced Lighting | 15 | 40.00%（6/15） | 66.67%（10/15） |
+| OOD: Different Object（未见绿色 Cube） | 15 | 46.67%（7/15） | 73.33%（11/15） |
+| OOD: Distractors | 15 | 46.67%（7/15） | 73.33%（11/15） |
+| **OOD 合计** | **60** | **41.67%（25/60）** | **73.33%（44/60）** |
+| **全部场景** | **100** | **55%（55/100）** | **79%（79/100）** |
+
+| Recovery 诊断指标 | Baseline | Improved |
+|---|---:|---:|
+| 有效可控掉落测试 | 10 次 | 10 次 |
+| 尝试重抓次数 | 3 | 8 |
+| 成功重抓次数 | 2 | 6 |
+| 最终入杯次数 | 1 | 5 |
+| Re-grasp Success Rate（重抓成功 / 有效掉落） | 20% | **60%** |
+| Recovery Success Rate（重抓后入杯 / 有效掉落） | 10% | **50%** |
 
 ## 工程入口
 
