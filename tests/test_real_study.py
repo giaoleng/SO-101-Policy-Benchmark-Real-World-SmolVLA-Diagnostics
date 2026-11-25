@@ -13,7 +13,7 @@ from scripts.real.study_protocol import (
     EVAL_CELLS, TRAINING_SEEDS, SCORED_EPISODES, TOTAL_SCORED_EPISODES,
     BASELINE_DEMOS, RECOVERY_TESTS_PER_MODEL, recovery_plan,
 )
-from scripts.real.train_study import training_command, check_dataset
+from scripts.real.train_study import training_command, check_dataset, default_rename_map
 from scripts.real.record_study import record_command
 from scripts.real.summarize_study import summarize, read_logs
 
@@ -140,6 +140,20 @@ class RealStudyProtocol(unittest.TestCase):
         ood_rows = [row for row in result if row['eval_cell'] in EVAL_CELLS[1:]]
         self.assertTrue(all(row['episodes'] == 15 for row in ood_rows))
 
+    def test_default_training_camera_map_and_legacy_alias(self):
+        front = 'observation.images.front'
+        overhead = 'observation.images.overhead'
+        wrist = 'observation.images.wrist'
+        expected = {front: 'observation.images.camera1', wrist: 'observation.images.camera2'}
+        self.assertEqual(default_rename_map(), expected)
+        self.assertEqual(default_rename_map({front: {}, wrist: {}}), expected)
+        self.assertEqual(default_rename_map({overhead: {}, wrist: {}}),
+                         {overhead: 'observation.images.camera1', wrist: 'observation.images.camera2'})
+        with self.assertRaisesRegex(ValueError, 'Missing camera features'):
+            default_rename_map({front: {}})
+        with self.assertRaisesRegex(ValueError, 'Both front and overhead'):
+            default_rename_map({front: {}, overhead: {}, wrist: {}})
+
     def test_reference_dataset_camera_keys_map_to_real_robot_camera_handles(self):
         cameras = {'front': {'index_or_path': 0}, 'wrist': {'index_or_path': 1}}
         reference_map = {
@@ -198,7 +212,11 @@ class RealStudyProtocol(unittest.TestCase):
              patch('builtins.input', side_effect=AssertionError('prompted for real robot')), \
              redirect_stdout(StringIO()):
             record_main(record_args + ['--dry-run'])
-            train_main(train_args + ['--dry-run'])
+            train_output = StringIO()
+            with redirect_stdout(train_output):
+                train_main(train_args + ['--dry-run'])
+            self.assertIn('observation.images.front', train_output.getvalue())
+            self.assertNotIn('observation.images.overhead', train_output.getvalue())
             evaluate_main(eval_args + ['--dry-run'])
 
         # Without --dry-run, the entrypoints enter execution checks;
