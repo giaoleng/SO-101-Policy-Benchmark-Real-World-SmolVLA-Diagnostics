@@ -7,41 +7,47 @@
 
 ## 目录
 
-- [一、项目介绍、演示与实验结果](#highlights)
-  - [仿真演示与三策略结果](#demo-sim)
-  - [真机演示与失败模式](#demo-real)
-  - [Baseline 与 Improved 结果概览](#demo-results)
-- [二、项目概览与公共环境配置](#overview)
-  - [2.1 系统架构与实验说明](#project-overview)
-  - [2.2 环境安装与依赖](#installation)
-- [三、MuJoCo 仿真实验](#sim-env-data)
-  - [3.1 仿真环境与数据集准备](#sim-scene)
-  - [3.2 数据集质量检查](#sim-dataset)
-  - [3.3 三种策略训练](#sim-training)
-  - [3.4 闭环推理与 ID / OOD 评估](#sim-evaluation)
-  - [3.5 指标说明](#sim-metrics)
-- [四、SO-101 真机实验](#real-env-data)
-  - [4.1 真机标定与硬件检查](#real-hardware-setup)
-  - [4.2 四组示教数据与 ID / OOD 划分](#real-datasets)
-  - [4.3 任务控制变量](#real-controls)
-  - [4.4 示教数据采集](#real-collection)
+- [0. 项目演示与核心结果](#highlights)
+  - [0.1 仿真成功与失败视频](#demo-sim)
+  - [0.2 仿真实验结果](#sim-demo-results)
+  - [0.3 真机演示与失败模式](#demo-real)
+  - [0.4 失败模式分析](#failure-analysis)
+  - [0.5 根据失败模式组织固定策略示教数据](#demo-data-strategies)
+  - [0.6 仿真与真机实验结果概览](#demo-results)
+- [1. 项目概览与系统架构](#overview)
+  - [1.1 仿真与真机实验对比](#project-overview)
+  - [1.2 系统流水线](#system-pipeline)
+- [2. 安装与环境配置](#installation)
+  - [2.1 Docker 环境（推荐）](#docker-env)
+  - [2.2 本地 Python 虚拟环境](#python-env)
+- [3. MuJoCo 仿真实验](#sim-env-data)
+  - [3.1 SO-101 MuJoCo 仿真场景](#sim-scene)
+  - [3.2 开源数据集转换与质量校验](#sim-dataset)
+  - [3.3 三种模仿学习策略训练](#sim-training)
+  - [3.4 统一闭环评测与 ID / OOD 实验设计](#sim-evaluation)
+  - [3.5 仿真评测指标定义](#sim-metrics)
+- [4. SO-101 真机实验](#real-env-data)
+  - [4.1 真机部署与硬件检查](#real-hardware-setup)
+  - [4.2 四组示教数据集与 ID / OOD 划分](#real-datasets)
+  - [4.3 统一任务与控制变量](#real-controls)
+  - [4.4 根据失败模式组织四组固定策略示教数据](#real-collection)
   - [4.5 Baseline / Improved SmolVLA 训练](#real-training)
-  - [4.6 推理与统一真机评测](#real-evaluation)
+  - [4.6 推理与五类统一评测场景](#real-evaluation)
   - [4.7 失败模式统计](#real-failure-analysis)
-  - [4.8 结果解释](#real-results)
-- [五、数据管理与复现提示](#data-management)
+  - [4.8 评测结果统计与分析](#real-results)
+- [5. 数据管理与复现提示](#data-management)
   - [5.1 私有示教数据管理](#private-data)
-  - [5.2 复现提示](#reproducibility)
-- [六、许可证](#license)
+  - [5.2 实验复现与工程规范](#reproducibility)
+- [6. 许可证](#license)
 ---
 
 <a id="highlights"></a>
 
-## 项目演示与核心结果
+## 0. 项目演示与核心结果
 
 <a id="demo-sim"></a>
 
-### 仿真成功与失败视频
+### 0.1 仿真成功与失败视频
 
 **✅ 成功示例**
 
@@ -54,7 +60,9 @@ https://github.com/user-attachments/assets/b897b248-aaac-427f-8586-3e0412ba6b23
 
 
 
-### 仿真实验结果
+<a id="sim-demo-results"></a>
+
+### 0.2 仿真实验结果
 
 | Metric | ACT | Diffusion Policy | SmolVLA |
 |---|---:|---:|---:|
@@ -64,32 +72,34 @@ https://github.com/user-attachments/assets/b897b248-aaac-427f-8586-3e0412ba6b23
 
 <a id="demo-real"></a>
 
+### 0.3 真机演示与失败模式
 
-#### 1. 正常操作：Success
+
+#### 0.3.1 正常操作：Success
 
 https://github.com/user-attachments/assets/9fa9a44b-a124-4daa-95e9-cd610ffb2621
 
 作为正常操作对照，视频展示接近、夹取、搬运和释放等基本阶段。
 
-#### 2. 目标接近失败：Reach Failure
+#### 0.3.2 目标接近失败：Reach Failure
 
 https://github.com/user-attachments/assets/bbaef4dc-106d-4fae-a9b8-1aff7b190b3d
 
 视频中方块位置发生偏移，机械臂没有准确到达目标位置，最终未能完成抓取。
 
-#### 3. 动作启动失败：No Motion
+#### 0.3.3 动作启动失败：No Motion
 
 https://github.com/user-attachments/assets/ed2eac7b-f7ce-4398-b8cd-6ba9fa5d1600
 
 机械臂在初始姿态附近小幅抖动，没有形成有效的接近动作。
 
-#### 4. 掉落恢复失败：Recovery Failure
+#### 0.3.4 掉落恢复失败：Recovery Failure
 
 https://github.com/user-attachments/assets/54a7244c-4357-44bf-8dc6-48e12bf8f12b
 
 方块在搬运过程中掉落，机械臂没有完成重新定位、再次抓取和后续放置。
 
-#### 5. 重新抓取：Re-grasp
+#### 0.3.5 重新抓取：Re-grasp
 
 https://github.com/user-attachments/assets/55915c62-7fe4-46f4-ad79-bfd149a8a380
 
@@ -97,7 +107,7 @@ https://github.com/user-attachments/assets/55915c62-7fe4-46f4-ad79-bfd149a8a380
 
 <a id="failure-analysis"></a>
 
-### 失败模式分析：从真机现象到改进决策
+### 0.4 失败模式分析：从真机现象到改进决策
 
 我先按执行阶段复盘真机视频，而不是将所有失败直接归因于示教不足。下表中的**观察结果来自上方视频描述**；“定位结论”是基于可见行为形成的阶段性判断，未把缺少原始动作日志支持的假设写成已证实根因。
 
@@ -108,19 +118,19 @@ https://github.com/user-attachments/assets/55915c62-7fe4-46f4-ad79-bfd149a8a380
 | **Recovery Failure** | Cube 在搬运中掉落，机械臂未完成重新定位、重抓和放置；失败发生在 **Post-drop Recovery** 阶段 | 区分掉落原因、掉落后目标是否可见，以及新观测后的动作更新和夹爪执行问题 | 在确认可观测、可执行的前提下，将 **Recovery** 作为恢复行为增强方向 |
 | **Re-grasp** | Cube 掉落后，机械臂重新接近并成功抓起；这是**成功的重抓行为**，不是另一种失败类型 | 比较它与 Recovery Failure 的重新接近、闭合夹爪、抬升阶段；单次重抓不等于完整任务恢复 | 用成功与失败案例对照明确 Recovery 示教需要覆盖的完整动作序列 |
 
-#### 1. Reach Failure：为什么不是直接补充位置示教？
+#### 0.4.1 Reach Failure：为什么不是直接补充位置示教？
 
 我从视频中能确定的是**目标位置改变后，接近阶段出现偏差**，而不是“已经证明模型缺少位置泛化”。我将排查分成三步：首先对照模型预测目标、`ActionGuard` 限幅后目标和关节反馈，排除明显的执行阻断；然后确认前置/腕部相机的画面、安装视角和训练特征映射一致；最后在杯子、颜色、光照和机械臂初始姿态不变的条件下，对比标准位置和训练未覆盖的新位置。
 
 这套对照的判别逻辑是：**如果关节跟踪或相机输入存在异常，就先修复系统；只有在这些条件基本正常、失败又集中于新位置时，才将空间泛化不足作为主要策略假设。** 视频能确认本次未准确接近，但仓库现有回合级日志不能证明已排除全部标定或视觉问题。因此，我把 50 条多位置 **Randomized** 示教定位为针对这一假设的改进，并通过 New Positions OOD 评测检验效果，而不宣称它已经单独解释了所有 Reach Failure。
 
-#### 2. No Motion：为什么没有专门设计一组示教？
+#### 0.4.2 No Motion：为什么没有专门设计一组示教？
 
 视频里机械臂**有小幅抖动，却没有有效接近**。这并不等于串口一定正常，也不等于模型预测了全零动作。我按控制链路依次区分：① 模型是否正常完成推理、有没有超时；② 预测关节目标是否长期接近当前状态；③ 预测动作是否被位置/速度限制截断；④ 指令是否下发，以及关节反馈有没有跟随。
 
 对应的处理结论也不同：如果是端口、供电、标定或电机使能问题，应修复硬件与控制配置；如果是动作幅度异常，则核对微调 Checkpoint、Processor、动作归一化统计量、关节顺序与角度单位；如果上述环节正常而预测仍持续近似静止，再回头检查示教中的异常等待片段或策略退化。**目前视频只能支持“无有效接近”的现象结论，不能把某一种通信故障或归一化错误写成已经查明的根因。** 因此，No Motion 不作为“增加示教即可解决”的证据。
 
-#### 3. Recovery Failure 与 Re-grasp：为什么要一起分析？
+#### 0.4.3 Recovery Failure 与 Re-grasp：为什么要一起分析？
 
 Recovery Failure 视频显示**掉落后没有完成重新定位和重抓**；另一段 Re-grasp 视频则展示了**掉落后重新接近并抓起方块**。我将两段视频按“掉落 → 重新观察 → 调整运动 → 重新接近 → 闭合夹爪 → 抬起 → 最终放置”分段对照。两段视频的直接差别在于：一段没有完成重抓，另一段完成了重抓；但仅凭视频尚不能确认失败是由于 Action Chunk 未及时更新、目标遮挡、夹爪执行问题，还是策略缺乏恢复行为。
 
@@ -128,7 +138,9 @@ Recovery Failure 视频显示**掉落后没有完成重新定位和重抓**；�
 
 **证据边界：** 上述排查顺序参考 SO-101 / LeRobot 工程实践，属于本项目的诊断方法与阶段性分析；仓库现有 `runtime.py` 自动记录推理耗时、控制步数和限幅步数，但尚未完整保存逐步预测动作、下发动作与关节反馈。因此，实际故障根因仍须由真实日志核验。失败阶段标签、诊断指标和 Recovery 专项的统计口径见[真机失败模式与恢复指标](docs/FAILURE_DIAGNOSTICS.md)。
 
-### 根据失败模式组织固定策略示教数据
+<a id="demo-data-strategies"></a>
+
+### 0.5 根据失败模式组织固定策略示教数据
 
 上述分析让我将**硬件/控制问题的修复**与**策略能力的增强**分开：Reach Failure 引出位置泛化假设，Recovery Failure 与成功 Re-grasp 的对照引出恢复行为训练；No Motion 优先做控制链路诊断。**Color-varied** 则是额外设计的外观泛化维度，并非直接从上述四段视频中的某一类失败推导出来。
 
@@ -145,7 +157,7 @@ Recovery Failure 视频显示**掉落后没有完成重新定位和重抓**；�
 
 <a id="demo-results"></a>
 
-### 仿真与真机实验结果概览
+### 0.6 仿真与真机实验结果概览
 
 | 实验 | 模型 / 数据条件 | 结果 |
 |---|---|---|
@@ -317,11 +329,9 @@ python scripts/convert_lerobot_dataset_v21_to_v30_local.py \
 
 <a id="sim-train-eval"></a>
 
-### 3.3 训练与闭环评测
-
 <a id="sim-training"></a>
 
-#### 3.3.1 三种模仿学习策略训练
+### 3.3 三种模仿学习策略训练
 
 在相同的数据集与训练划分下，独立训练三类代表性策略进行横向对比：
 
@@ -364,7 +374,7 @@ lerobot-train \
 
 <a id="sim-evaluation"></a>
 
-#### 3.4 统一闭环评测与 ID / OOD 实验设计
+### 3.4 统一闭环评测与 ID / OOD 实验设计
 
 评测阶段彻底脱离任何专家控制器，由策略权重根据实时观测独立输出 Action Chunk 并在 MuJoCo 中闭环执行。
 
@@ -429,7 +439,7 @@ python scripts/eval/summarize_rollouts.py outputs/eval/act_id_seed42.jsonl \
 
 <a id="sim-metrics"></a>
 
-#### 3.5 仿真评测指标定义
+### 3.5 仿真评测指标定义
 
 | 指标 | 定义说明 | 优化方向 |
 | :--- | :--- | :---: |
@@ -503,11 +513,11 @@ python scripts/real/download_study_datasets.py \
   --condition clean randomized recovery color
 ```
 
-下载脚本会解析并记录 Dataset commit SHA，校验每组 50 条示教、30 FPS、六维 action/state 及 overhead/wrist 双相机特征，并将数据保存到本地。脚本只下载，不会上传数据。
+下载脚本会解析并记录 Dataset commit SHA，校验每组 50 条示教、30 FPS、六维 action/state 及 front/wrist 双相机特征（兼容历史 overhead 字段），并将数据保存到本地。脚本只下载，不会上传数据。
 
 **ID / OOD 划分：** 训练使用 Clean、Randomized、Recovery、Color-varied 四组示教；绿色 Cube 不进入训练集。真机正式评测每组模型 ID 40 次（红色方块置于标准位置、标准光照），OOD 共 60 次：新位置、低光照、绿色方块及干扰物四项各 15 次。ID:OOD = **40:60** 是评测比例，不是训练集中的 ID:OOD 采样比例。
 
-训练时将数据集的 `observation.images.overhead`、`observation.images.wrist` 映射到策略输入的 `camera1`、`camera2`；真机推理时使用 front / wrist 两路相机。相机名称、分辨率、FPS 和特征映射必须与训练配置一致。
+采集与训练统一使用 `observation.images.front`、`observation.images.wrist`，默认映射到策略输入的 `camera1`、`camera2`；真机推理使用 front / wrist 两路相机。历史数据中的 `observation.images.overhead` 会依据元数据自动识别并映射到 `camera1`，旧 Checkpoint 保留原映射；四组数据合并前仍须具有一致的实际特征 Schema。相机名称、分辨率、FPS 和特征映射必须与训练配置一致。
 
 <a id="real-controls"></a>
 
@@ -554,11 +564,9 @@ python scripts/real/record_study.py \
 
 <a id="real-train-eval"></a>
 
-### 4.5 Baseline / Improved SmolVLA 训练与推理评测
-
 <a id="real-training"></a>
 
-#### 4.5.1 两个真机 SmolVLA 模型的训练对照
+### 4.5 Baseline / Improved SmolVLA 训练
 
 正式对照仅包含 **Baseline SmolVLA** 和 **Improved SmolVLA**，共用同一个 `scripts/real/train_study.py` 训练入口。二者使用同一 SmolVLA 基础权重、Full Fine-Tuning（不配置 LoRA）、Seed 1000、10,000 steps、batch size 32 和每 2,000 steps 保存一次 Checkpoint；唯一变化因素是训练数据。
 
@@ -618,7 +626,7 @@ python scripts/real/train_study.py \
 
 <a id="real-evaluation"></a>
 
-#### 4.6 推理与五类统一评测场景
+### 4.6 推理与五类统一评测场景
 
 Baseline 与 Improved 使用相同的真机环境、相机与复位方式，每个模型 **ID 40 次、OOD 60 次**，四类 OOD 分别测试 15 次；每个场景另有 1 次不计分预热。因此两模型协议共 **200 次正式计分 Rollout + 10 次预热**。
 
@@ -679,7 +687,7 @@ python scripts/real/summarize_study.py outputs/real/eval_*.jsonl \
 
 行为诊断同时包含 **No-Motion Rate、Reach Rate、Grasp Rate、Drop Rate、Re-grasp per Drop、Recovery per Drop**。若某阶段未被操作者标注，统计程序不会自动假设成功或失败。当前运行器保存每回合推理延迟、控制步数、限幅次数及操作者标签；逐步关节轨迹、动作方向角和相机视频不由该运行器自动保存。各阶段标签与统计定义见[真机失败模式与恢复指标](docs/FAILURE_DIAGNOSTICS.md)。
 
-#### Recovery 专项评测（独立于正式 ID/OOD）
+#### 4.7.1 Recovery 专项评测（独立于正式 ID/OOD）
 
 Baseline 与 Improved 均已完成 10 次有效可控掉落测试。测试记录掉落后是否尝试重抓、是否成功重抓，以及是否最终完成入杯；掉落后不提供人工接管。Recovery 专项不并入每模型 100 次正式 ID/OOD 评测。
 
@@ -734,7 +742,7 @@ python scripts/real/download_study_datasets.py \
   --condition clean randomized recovery color
 ```
 
-脚本会解析并记录固定 commit SHA，校验每组 50 条示教、30 FPS、六维 action/state 和 overhead/wrist 双相机特征，然后保存到本地 `data/real_demonstrations/`。该脚本只下载，不会将本地数据上传到 Hub。采集和训练入口也分别关闭 `dataset.push_to_hub` 与 `policy.push_to_hub`。 如需通过 Hub 管理项目产物，`scripts/hf/upload_hf.py` 仅允许上传到私有仓库，会拒绝公开仓库目标。
+脚本会解析并记录固定 commit SHA，校验每组 50 条示教、30 FPS、六维 action/state 和 front/wrist 双相机特征（兼容历史 overhead 字段），然后保存到本地 `data/real_demonstrations/`。该脚本只下载，不会将本地数据上传到 Hub。采集和训练入口也分别关闭 `dataset.push_to_hub` 与 `policy.push_to_hub`。 如需通过 Hub 管理项目产物，`scripts/hf/upload_hf.py` 仅允许上传到私有仓库，会拒绝公开仓库目标。
 
 <a id="reproducibility"></a>
 
