@@ -23,7 +23,7 @@ EXPECTED_FPS = 30
 REQUIRED_FEATURES = (
     "action",
     "observation.state",
-    "observation.images.overhead",
+    "observation.images.front",
     "observation.images.wrist",
 )
 
@@ -36,7 +36,11 @@ def validate_dataset_metadata(metadata: dict[str, Any]) -> None:
     if metadata.get("fps") != EXPECTED_FPS:
         raise ValueError(f"Expected {EXPECTED_FPS} FPS, got {metadata.get('fps')}")
     features = metadata.get("features", {})
-    missing = [key for key in REQUIRED_FEATURES if key not in features]
+    # Existing datasets may use overhead for the same physical front view.
+    required = list(REQUIRED_FEATURES)
+    if "observation.images.front" not in features and "observation.images.overhead" in features:
+        required[required.index("observation.images.front")] = "observation.images.overhead"
+    missing = [key for key in required if key not in features]
     if missing:
         raise ValueError(f"Missing required LeRobot features: {missing}")
     for key in ("action", "observation.state"):
